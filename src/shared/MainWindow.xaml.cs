@@ -371,13 +371,15 @@ public partial class MainWindow : Window
             foreach (var active in _live)
             {
                 if (!active.ProjectPath.Equals(project, StringComparison.OrdinalIgnoreCase) ||
-                    active.ClaudeSessionId is null ||
-                    active.Provider != "Claude" ||
-                    !active.Label.StartsWith("Nuova chat ", StringComparison.Ordinal)) continue;
+                    active.ClaudeSessionId is null) continue;
 
                 var transcript = items.FirstOrDefault(x => x.Provider == active.Provider &&
                     x.Id.Equals(active.ClaudeSessionId, StringComparison.OrdinalIgnoreCase));
-                if (transcript is not null) active.Label = transcript.Title;
+                if (transcript is null || active.Label == transcript.Title) continue;
+                active.Label = transcript.Title;
+                if (_visibleTerminalId == active.Id)
+                    ActiveTitle.Text = active.Provider + " · " + active.Label +
+                        " — " + Path.GetFileName(active.ProjectPath);
             }
             UpdateSidebar();
             if (!silent) FooterStatus.Text = items.Length + " conversazioni nello storico del progetto.";
