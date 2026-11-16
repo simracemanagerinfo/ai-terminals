@@ -29,6 +29,39 @@ dotnet publish src/claude/ClaudeTerminal.csproj -c Release -r win-x64 --self-con
 dotnet publish src/codex/CodexTerminal.csproj -c Release -r win-x64 --self-contained true -o out/CodexTerminal
 ```
 
+## Installazione o aggiornamento da GitHub
+
+Non si scaricano ZIP manualmente e non si creano alias PowerShell.
+
+Durante il collaudo **non sostituire Claude Terminal**, che è già funzionante:
+```powershell
+& '.\scripts\Install-AITerminals.ps1' -App Codex
+```
+
+Lo script seleziona l'ultima GitHub Actions Windows riuscita, usando `gh auth`
+o Git Credential Manager già configurato. Scarica il pacchetto Codex
+in una directory temporanea, verifica i file e lo installa in
+`%LOCALAPPDATA%\PowerShellCustomization\CodexTerminal`.
+
+Dopo il collaudo e la release, per entrambe le applicazioni:
+```powershell
+& '.\scripts\Install-AITerminals.ps1' -App Both
+```
+
+La directory di Claude rimane quella esistente
+(`%LOCALAPPDATA%\PowerShellCustomization\ClaudeTerminal`);
+il programma non tocca i dati persistenti di WebView2 né i transcript.
+In presenza di processi attivi o di una cartella sconosciuta interrompe
+l'operazione senza cancellare nulla.
+
+## Prova richiesta prima della release
+
+- Avvio delle due finestre contemporaneamente.
+- Sessioni multiple, storico e cambio progetto dentro ogni app.
+- Icona corretta per ciascun EXE e barra delle applicazioni.
+- `Shift+Invio` dentro Claude, copia/incolla e popup token.
+- Aggiornamento in-place senza cartelle residue.
+
 ## Privacy
 
 L'app legge transcript JSONL locali solo per storico e statistiche di token; **non** trasferisce conversazioni, chiavi API o credenziali al repository. Le statistiche locali non rappresentano quota residua o fatturazione ufficiale.
