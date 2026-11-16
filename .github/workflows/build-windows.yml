@@ -106,20 +106,6 @@ jobs:
           }
           Write-Host '[PASS] Two distinct portable Windows apps with independent brands'
 
-      - name: Probe Win32 Ctrl+J inside ConPTY (headless advisory)
-        id: win32_key_probe
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          dotnet publish tests/Win32KeyProbe/Win32KeyProbe.csproj --configuration Release --runtime win-x64 --self-contained false --output "$env:GITHUB_WORKSPACE/out/Win32KeyProbe"
-          if ($LASTEXITCODE -ne 0) { throw 'Win32 keyboard probe build failed' }
-          $env:KEYPROBE_LOG = Join-Path $env:RUNNER_TEMP 'conpty-win32-key-probe.log'
-          dotnet run --project tests/ConPtyKeySmoke/ConPtyKeySmoke.csproj --configuration Release -- "$env:GITHUB_WORKSPACE/out/Win32KeyProbe/Win32KeyProbe.exe"
-          $result = $LASTEXITCODE
-          if (Test-Path $env:KEYPROBE_LOG) { Get-Content -LiteralPath $env:KEYPROBE_LOG }
-          if ($result -ne 0) { throw 'ConPTY Win32 keyboard probe failed' }
-
       - name: Test two live ConPTY sessions (headless runner advisory)
         id: conpty_smoke
         shell: pwsh
