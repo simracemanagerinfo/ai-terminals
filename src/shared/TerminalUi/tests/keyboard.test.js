@@ -26,7 +26,7 @@ test('Shift+Enter in Claude sends Ctrl+J newline (LF), not CR submit', () => {
 test('Shift+Enter in Codex sends Ctrl+J newline (LF), not Enter submit', () => {
   assert.deepEqual(
     getTerminalShortcut(keyEvent({shiftKey: true}), 'codex'),
-    {type: 'input', data: '\\x0a'}
+    {type: 'input', data: '\x0a'}
   );
 });
 
