@@ -13,6 +13,7 @@ public static class CodexHistory
 
         var folders = new[] { Path.Combine(home, "sessions"), Path.Combine(home, "archived_sessions") };
         var wanted = Path.GetFullPath(directory).TrimEnd(Path.DirectorySeparatorChar);
+        var names = LoadSessionNames(Path.Combine(home, "session_index.jsonl"));
         var found = new Dictionary<string, HistoryEntry>(StringComparer.OrdinalIgnoreCase);
 
         IEnumerable<string> files = [];
@@ -35,39 +36,55 @@ public static class CodexHistory
                 using var reader = new StreamReader(fs);
                 string? id = null;
                 string? cwd = null;
-                string? title = null;
+                string? firstPrompt = null;
 
-                for (var n = 0; n < 300 && !reader.EndOfStream; n++)
+                // Codex serializes user prompts both as event_msg/user_message
+                // and as response_item/message/role=user/content/input_text.
+                // Older and newer versions can write only one representation.
+                for (var n = 0; n < 1000 && !reader.EndOfStream; n++)
                 {
                     var line = reader.ReadLine();
-                    if (string.IsNullOrEmpty(line)) continue;
-                    JsonDocument doc;
-                    try { doc = JsonDocument.Parse(line); }
-                    catch (JsonException) { continue; }
-
-                    using (doc)
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    try
                     {
+                        using var doc = JsonDocument.Parse(line);
                         var root = doc.RootElement;
-                        if (!root.TryGetProperty("type", out var ty)) continue;
-                        if (!root.TryGetProperty("payload", out var payload) ||
-                            payload.ValueKind != JsonValueKind.Object) continue;
+                        if (!TryString(root, "type", out var type) ||
+                            !root.TryGetProperty("payload", out var payload) ||
+                            payload.ValueKind != JsonValueKind.Object)
+                            continue;
 
-                        if (ty.ValueKind == JsonValueKind.String && ty.GetString() == "session_meta")
+                        if (type == "session_meta")
                         {
-                            if (payload.TryGetProperty("cwd", out var wd) && wd.ValueKind == JsonValueKind.String)
-                                cwd = wd.GetString();
-                            if (payload.TryGetProperty("id", out var identity) && identity.ValueKind == JsonValueKind.String)
-                                id = identity.GetString();
+                            if (TryString(payload, "cwd", out var directoryValue))
+                                cwd = directoryValue;
+                            if (TryString(payload, "id", out var value) ||
+                                TryString(payload, "session_id", out value))
+                                id = value;
                         }
-                        else if (ty.ValueKind == JsonValueKind.String && ty.GetString() == "event_msg" &&
-                                 payload.TryGetProperty("type", out var evt) && evt.GetString() == "user_message")
+                        else if (firstPrompt is null && type == "event_msg" &&
+                                 TryString(payload, "type", out var eventType) &&
+                                 eventType == "user_message" &&
+                                 TryString(payload, "message", out var prompt))
                         {
-                            if (payload.TryGetProperty("message", out var text) &&
-                                text.ValueKind == JsonValueKind.String)
-                                title = text.GetString();
+                            firstPrompt = prompt;
+                        }
+                        else if (firstPrompt is null && type == "response_item" &&
+                                 TryString(payload, "type", out var itemType) &&
+                                 itemType == "message" &&
+                                 TryString(payload, "role", out var role) &&
+                                 role == "user" &&
+                                 payload.TryGetProperty("content", out var parts))
+                        {
+                            firstPrompt = ReadUserContent(parts);
                         }
                     }
-                    if (cwd is not null && id is not null && title is not null) break;
+                    catch (JsonException) { }
+
+                    if (!string.IsNullOrWhiteSpace(id) &&
+                        !string.IsNullOrWhiteSpace(cwd) &&
+                        !string.IsNullOrWhiteSpace(firstPrompt))
+                        break;
                 }
 
                 if (!Guid.TryParse(id, out _) || string.IsNullOrWhiteSpace(cwd)) continue;
@@ -75,16 +92,84 @@ public static class CodexHistory
                 try { fullPath = Path.GetFullPath(cwd).TrimEnd(Path.DirectorySeparatorChar); }
                 catch { continue; }
                 if (!StringComparer.OrdinalIgnoreCase.Equals(wanted, fullPath)) continue;
-                if (string.IsNullOrWhiteSpace(title)) title = "Codex " + id[..8];
-                title = string.Join(" ", title.Split(['\r','\n','\t'], StringSplitOptions.RemoveEmptyEntries)).Trim();
-                if (title.Length > 90) title = title[..87] + "...";
-                var row = new HistoryEntry(id, title, fullPath, File.GetLastWriteTimeUtc(path), "Codex");
-                found.TryAdd(id, row);
+
+                // Explicit /rename names are append-only in session_index.jsonl.
+                // Prefer them to the first prompt, just like Codex resume.
+                string title = names.TryGetValue(id!, out var name) ? name : firstPrompt ?? "";
+                title = NormalizeTitle(title);
+                if (title.Length == 0) title = "Codex " + id![..8];
+
+                var row = new HistoryEntry(id!, title, fullPath, File.GetLastWriteTimeUtc(path), "Codex");
+                // The same thread can exist in sessions and archived_sessions.
+                found.TryAdd(id!, row);
             }
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
-            catch (JsonException) { }
         }
         return found.Values.OrderByDescending(x => x.Timestamp).Take(250).ToArray();
+    }
+
+    private static Dictionary<string, string> LoadSessionNames(string path)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (!File.Exists(path)) return result;
+        try
+        {
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var reader = new StreamReader(fs);
+            string? line;
+            while ((line = reader.ReadLine()) is not null)
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                try
+                {
+                    using var doc = JsonDocument.Parse(line);
+                    var root = doc.RootElement;
+                    if (!(TryString(root, "id", out var id) ||
+                          TryString(root, "session_id", out id)) ||
+                        !Guid.TryParse(id, out _) ||
+                        !TryString(root, "thread_name", out var title)) continue;
+                    title = NormalizeTitle(title);
+                    if (title.Length > 0) result[id] = title; // latest rename wins
+                }
+                catch (JsonException) { } // Ignore torn final JSONL lines.
+            }
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+        return result;
+    }
+
+    private static string? ReadUserContent(JsonElement content)
+    {
+        if (content.ValueKind == JsonValueKind.String)
+            return content.GetString();
+        if (content.ValueKind != JsonValueKind.Array) return null;
+        foreach (var part in content.EnumerateArray())
+        {
+            if (part.ValueKind != JsonValueKind.Object ||
+                !TryString(part, "type", out var type) ||
+                (type != "input_text" && type != "text") ||
+                !TryString(part, "text", out var text)) continue;
+            return text;
+        }
+        return null;
+    }
+
+    private static bool TryString(JsonElement element, string key, out string value)
+    {
+        value = "";
+        if (element.ValueKind != JsonValueKind.Object ||
+            !element.TryGetProperty(key, out var token) ||
+            token.ValueKind != JsonValueKind.String) return false;
+        value = token.GetString() ?? "";
+        return !string.IsNullOrWhiteSpace(value);
+    }
+
+    private static string NormalizeTitle(string title)
+    {
+        title = string.Join(" ", title.Split(['\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries)).Trim();
+        if (title.Length > 90) title = title[..87] + "...";
+        return title;
     }
 }
