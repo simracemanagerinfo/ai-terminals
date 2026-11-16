@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {getTerminalShortcut} from '../src/keyboard.js';
+import {getTerminalShortcut, WIN32_CTRL_J} from '../src/keyboard.js';
 
 function keyEvent(overrides = {}) {
   return {
@@ -23,22 +23,33 @@ test('Shift+Enter in Claude sends Ctrl+J newline (LF), not CR submit', () => {
   );
 });
 
-test('Shift+Enter in Codex sends Ctrl+J newline (LF), not Enter submit', () => {
-  assert.deepEqual(
-    getTerminalShortcut(keyEvent({shiftKey: true}), 'codex'),
-    {type: 'input', data: '\x0a'}
-  );
+test('Codex multiline keys emit Win32 Ctrl+J, not plain LF', () => {
+  assert.equal(WIN32_CTRL_J, '\x1b[74;36;10;1;8;1_\x1b[74;36;10;0;8;1_');
+  const cases = [
+    keyEvent({shiftKey: true}),
+    keyEvent({ctrlKey: true}),
+    keyEvent({key: 'j', code: 'KeyJ', ctrlKey: true}),
+  ];
+  for (const ev of cases) {
+    assert.deepEqual(getTerminalShortcut(ev, 'codex'), {type: 'input', data: WIN32_CTRL_J});
+  }
 });
 
-test('Enter and Ctrl+Enter remain native in both AI terminals', () => {
-  for (const mode of ['claude', 'codex']) {
-    assert.equal(getTerminalShortcut(keyEvent(), mode), null);
-    assert.equal(getTerminalShortcut(keyEvent({ctrlKey: true}), mode), null);
-  }
+test('Plain Enter and Ctrl+Enter stay native in Claude; plain Enter in Codex', () => {
+  assert.equal(getTerminalShortcut(keyEvent(), 'claude'), null);
+  assert.equal(getTerminalShortcut(keyEvent({ctrlKey: true}), 'claude'), null);
+  assert.equal(getTerminalShortcut(keyEvent(), 'codex'), null);
 });
 
 test('Shift+Enter is not intercepted in diagnostic PowerShell', () => {
   assert.equal(getTerminalShortcut(keyEvent({shiftKey: true}), 'shell'), null);
+});
+
+test('Codex preserves Ctrl+C, Ctrl+V and unmodified letter keys', () => {
+  assert.equal(getTerminalShortcut(keyEvent({key:'c',code:'KeyC',ctrlKey:true}), 'codex'), null);
+  assert.equal(getTerminalShortcut(keyEvent({key:'v',code:'KeyV',ctrlKey:true}), 'codex'), null);
+  assert.equal(getTerminalShortcut(keyEvent({key:'j',code:'KeyJ'}), 'codex'), null);
+  assert.equal(getTerminalShortcut(keyEvent({key:'j',code:'KeyJ',ctrlKey:true,shiftKey:true}), 'codex'), null);
 });
 
 test('Alt/Meta+Shift+Enter and IME composition stay untouched', () => {
