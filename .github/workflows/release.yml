@@ -1,0 +1,88 @@
+name: Publish AI Terminals v1.0.0
+
+on:
+  workflow_run:
+    workflows: ["AI Terminals - Windows x64"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout exactly the tested source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Download Claude Terminal from successful Windows build
+        uses: actions/download-artifact@v4
+        with:
+          name: ClaudeTerminal-win-x64
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: packages/ClaudeTerminal
+
+      - name: Download Codex Terminal from the same Windows build
+        uses: actions/download-artifact@v4
+        with:
+          name: CodexTerminal-win-x64
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: packages/CodexTerminal
+
+      - name: Verify packages and create versioned ZIP and checksums
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Path release-assets -Force | Out-Null
+          $checksums = @()
+          foreach ($agent in @('Claude', 'Codex')) {
+            $source = Join-Path 'packages' "$($agent)Terminal"
+            $required = @(
+              "$($agent)Terminal.exe",
+              'wwwroot/index.html',
+              "scripts/Start-$($agent)Session.ps1",
+              "assets/$($agent.ToLowerInvariant())-terminal.png"
+            )
+            foreach ($relative in $required) {
+              $check = Join-Path $source $relative
+              if (-not (Test-Path -LiteralPath $check -PathType Leaf)) {
+                throw "Missing required release file: $check"
+              }
+            }
+
+            $archive = Join-Path 'release-assets' "$($agent)Terminal-win-x64.zip"
+            Compress-Archive -Path (Join-Path $source '*') -DestinationPath $archive -CompressionLevel Optimal -Force
+            if ((Get-Item -LiteralPath $archive).Length -lt 1MB) {
+              throw "Unusually small release package: $archive"
+            }
+            $digest = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+            $checksums += "$digest  $([IO.Path]::GetFileName($archive))"
+            Write-Host "[OK] $archive SHA256 $digest"
+          }
+          $checksums | Set-Content -LiteralPath 'release-assets/SHA256SUMS.txt' -Encoding ascii
+
+      - name: Publish stable GitHub Release v1.0.0
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          gh release create v1.0.0 'release-assets/ClaudeTerminal-win-x64.zip' 'release-assets/CodexTerminal-win-x64.zip' 'release-assets/SHA256SUMS.txt' --repo $env:GITHUB_REPOSITORY --target $env:TESTED_SHA --title 'AI Terminals v1.0.0' --notes-file 'docs/releases/v1.0.0.md' --latest
+          if ($LASTEXITCODE -ne 0) {
+            throw "GitHub release publication failed ($LASTEXITCODE)"
+          }
