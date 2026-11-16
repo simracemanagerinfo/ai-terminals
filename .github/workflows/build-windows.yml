@@ -5,6 +5,7 @@ on:
     paths:
       - 'src/**'
       - 'tests/**'
+      - 'scripts/**'
       - '.github/workflows/build-windows.yml'
   pull_request:
   workflow_dispatch:
@@ -36,6 +37,27 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Keyboard tests failed' }
           npm run build
           if ($LASTEXITCODE -ne 0) { throw 'xterm renderer build failed' }
+
+      - name: Validate PowerShell entrypoints
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $paths = @(
+            'scripts/Install-AITerminals.ps1',
+            'src/claude/Start-ClaudeSession.ps1',
+            'src/codex/Start-CodexSession.ps1'
+          )
+          foreach ($path in $paths) {
+            $tokens = $null
+            $parseErrors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path -LiteralPath $path).Path, [ref]$tokens, [ref]$parseErrors
+            )
+            if ($parseErrors.Count -gt 0) {
+              throw ("PowerShell syntax error in {0}: {1}" -f $path, ($parseErrors | Out-String))
+            }
+          }
+          Write-Host '[PASS] PowerShell installers and launchers parse successfully'
 
       - name: Check token statistics and local history
         shell: pwsh
