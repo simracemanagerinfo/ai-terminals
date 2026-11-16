@@ -63,7 +63,7 @@ l'operazione senza cancellare nulla.
 - **Codex:** `Shift+Invio`, `Ctrl+Invio` e `Ctrl+J` generano un evento Windows `Ctrl+J` tramite ConPTY. Codex non sempre riconosce il semplice byte LF su Windows.
 - `Invio` resta dedicato all'invio; `Ctrl+C` e `Ctrl+V` mantengono il comportamento standard. Le scorciatoie browser di WebView2 vengono disabilitate **solo in Codex Terminal**, preservando gli appunti.
 - **Titoli Codex:** l'app legge `~/.codex/session_index.jsonl` e preferisce i nomi assegnati tramite `/rename`. Altrimenti legge il primo messaggio `response_item` o `event_msg` nel transcript. Le conversazioni non vengono modificate.
-- GitHub Actions include un vero test ConPTY del record Win32 `Ctrl+J`, tramite un programma che legge `ReadConsoleInputW`, oltre ai test JavaScript delle combinazioni.
+- GitHub Actions verificano sempre le combinazioni nel renderer e provano anche un test ConPTY con `ReadConsoleInputW`. Quest'ultimo resta *advisory* sul runner senza desktop, perché la console virtuale può non esporre un handle leggibile. Il funzionamento nella TUI Codex va confermato sul PC Windows.
 - Aggiornamento in-place senza cartelle residue.
 
 ## Privacy
