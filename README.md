@@ -59,7 +59,7 @@ l'operazione senza cancellare nulla.
 - Avvio delle due finestre contemporaneamente.
 - Sessioni multiple, storico e cambio progetto dentro ogni app.
 - Icona corretta per ciascun EXE e barra delle applicazioni.
-- `Shift+Invio` dentro Claude, copia/incolla e popup token.
+- `Shift+Invio` in entrambi i terminali inserisce una nuova riga (emette `Ctrl+J`/LF); Invio normale continua a inviare il messaggio. `Ctrl+C` e `Ctrl+V` non sono rimappati.
 - Aggiornamento in-place senza cartelle residue.
 
 ## Privacy
