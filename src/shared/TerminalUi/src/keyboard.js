@@ -1,9 +1,9 @@
-// Mapping locale del renderer: Ctrl+J (LF) e il comando "chat:newline"
-// predefinito di Claude. Non alterare Ctrl+Enter (in Claude puo significare Send Now).
+// Shift+Enter viene convertito in Ctrl+J (LF): newline per entrambe le TUI.
+// Rimangono intatti Ctrl+Enter, Ctrl+C, Ctrl+V e i tasti PowerShell.
 export function getTerminalShortcut(event, mode, hasSelection = false) {
   if (event.type !== 'keydown' || event.isComposing) return null;
 
-  if (mode === 'claude' && event.key === 'Enter' && event.shiftKey &&
+  if ((mode === 'claude' || mode === 'codex') && event.key === 'Enter' && event.shiftKey &&
       !event.ctrlKey && !event.altKey && !event.metaKey) {
     return {type: 'input', data: '\x0a'};
   }
