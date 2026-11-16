@@ -1,0 +1,115 @@
+<Window x:Class="ClaudeTerminal.Host.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Claude Terminal" Width="1280" Height="830" MinWidth="850" MinHeight="550"
+        Background="#191512" Foreground="#F5E4D6" FontFamily="Segoe UI"
+        WindowStartupLocation="CenterScreen">
+  <Window.Resources>
+    <Style TargetType="Button">
+      <Setter Property="Background" Value="#3D2D28"/>
+      <Setter Property="Foreground" Value="#FCEBDC"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="12,8"/>
+      <Setter Property="Margin" Value="0,0,7,0"/>
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style TargetType="TextBox">
+      <Setter Property="Background" Value="#322520"/>
+      <Setter Property="Foreground" Value="#FCEBDC"/>
+      <Setter Property="BorderBrush" Value="#60473B"/>
+      <Setter Property="Padding" Value="8"/>
+    </Style>
+    <Style TargetType="ListBoxItem">
+      <Setter Property="Padding" Value="9"/>
+      <Setter Property="Margin" Value="0,2,0,3"/>
+      <Setter Property="Background" Value="#29211D"/>
+      <Setter Property="Foreground" Value="#F9E8D8"/>
+      <Style.Triggers>
+        <Trigger Property="IsSelected" Value="True">
+          <Setter Property="Background" Value="#684131"/>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+  </Window.Resources>
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="310"/>
+      <ColumnDefinition Width="*"/>
+    </Grid.ColumnDefinitions>
+    <Border Grid.Column="0" Background="#241C18" BorderBrush="#4B352B" BorderThickness="0,0,1,0">
+      <DockPanel Margin="15">
+        <TextBlock DockPanel.Dock="Bottom" x:Name="SideStatus"
+                   Margin="0,14,0,2" TextWrapping="Wrap" Foreground="#AF9483"
+                   Text="Scegli un progetto. Nessuna sessione attiva." FontSize="11"/>
+        <StackPanel DockPanel.Dock="Top">
+          <TextBlock Text="CLAUDE TERMINAL" Foreground="#D97757" FontWeight="Bold" FontSize="18" Margin="0,0,0,3"/>
+          <TextBlock Text="CONPTY · MULTISESSIONE" Foreground="#9C897E" FontSize="11" Margin="0,0,0,16"/>
+          <TextBlock Text="Progetto" Margin="0,0,0,6" FontWeight="SemiBold"/>
+          <ComboBox x:Name="ProjectCombo" Height="32" IsEditable="True" Margin="0,0,0,9"/>
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,17">
+            <Button x:Name="BrowseButton" Content="Sfoglia..." Click="Browse_Click"/>
+            <Button x:Name="OpenProjectButton" Content="Apri progetto" Background="#D97757" Click="OpenProject_Click"/>
+          </StackPanel>
+          <DockPanel Margin="0,0,0,8" LastChildFill="True">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+              <Button Content="Cerca" Padding="8,3" Click="SearchToggle_Click" ToolTip="Mostra/nascondi ricerca (Ctrl+F)"/>
+              <Button Content="↻" Padding="9,3" Click="RefreshHistory_Click" ToolTip="Aggiorna storico dal disco"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+              <TextBlock Text="CONVERSAZIONI" Foreground="#EAB99E" FontWeight="SemiBold" FontSize="12"/>
+              <TextBlock x:Name="LiveCount" Text="  0 attive" Foreground="#A58F81" FontSize="12"/>
+            </StackPanel>
+          </DockPanel>
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+            <Button x:Name="NewSessionButton" Content="+ Nuova conversazione" Click="NewSession_Click"
+                    Background="#D97757" Padding="16,9"/>
+          </StackPanel>
+          <TextBox x:Name="ConversationFilter" TextChanged="ConversationFilter_TextChanged"
+                   Visibility="Collapsed" ToolTip="Cerca tra sessioni attive e storico"
+                   Margin="0,0,0,8"/>
+        </StackPanel>
+        <ListBox x:Name="ConversationsList"
+                 SelectionChanged="ConversationsList_SelectionChanged"
+                 MouseDoubleClick="ConversationsList_MouseDoubleClick"
+                 Background="Transparent" BorderThickness="0"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <StackPanel>
+                <TextBlock Text="{Binding Title}" FontWeight="SemiBold"
+                           TextWrapping="Wrap" MaxHeight="48"/>
+                <TextBlock Text="{Binding Detail}" Foreground="#CDB5A5"
+                           TextWrapping="Wrap" FontSize="11" Margin="0,4,0,0"/>
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+    </Border>
+    <Grid Grid.Column="1">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="44"/>
+        <RowDefinition Height="*"/>
+        <RowDefinition Height="30"/>
+      </Grid.RowDefinitions>
+      <Border Grid.Row="0" Background="#201914" BorderBrush="#48352A" BorderThickness="0,0,0,1">
+        <DockPanel Margin="15,0" LastChildFill="True">
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button Content="Token" Click="Usage_Click" Background="#3F605E" ToolTip="Consumi locali Claude"/>
+            <Button Content="Riprendi" Click="ResumeHistory_Click" Background="#69412E"/>
+            <Button Content="Chiudi sessione" Click="CloseSession_Click" Background="#4D2D2C"/>
+          </StackPanel>
+          <TextBlock x:Name="ActiveTitle" Text="Nessuna conversazione"
+                     VerticalAlignment="Center" FontWeight="SemiBold" Foreground="#EDC6B0"/>
+        </DockPanel>
+      </Border>
+      <Border Grid.Row="1" BorderBrush="#3F2C24" BorderThickness="1" Margin="10" Background="#16110F">
+        <wv2:WebView2 x:Name="TerminalView"/>
+      </Border>
+      <TextBlock Grid.Row="2" x:Name="FooterStatus" Margin="15,0"
+                 Foreground="#A9998E" FontSize="11" VerticalAlignment="Center"
+                 Text="Avvio renderer locale..."/>
+    </Grid>
+  </Grid>
+</Window>

@@ -1,16 +1,70 @@
 # AI Terminals
 
-Due applicazioni Windows indipendenti per **Claude Code** e **OpenAI Codex CLI**, con un motore ConPTY/xterm.js condiviso.
+Due applicazioni Windows indipendenti e portabili, con **motore ConPTY/xterm.js condiviso**.
 
-> **Migrazione in corso.** Le versioni di rilascio saranno pubblicate soltanto dopo il collaudo dei due EXE. Il terminale precedente non viene modificato.
+| App | Identità | Funzionalità |
+|---|---|---|
+| `ClaudeTerminal.exe` | Arancione / terracotta | Claude Code, sidebar progetti e chat, token locali, sessioni parallele |
+| `CodexTerminal.exe` | Grafite / teal | Codex CLI, sidebar progetti e chat, token locali, sessioni parallele |
 
-- `ClaudeTerminal.exe`: identità terracotta, esclusivamente conversazioni Claude.
-- `CodexTerminal.exe`: identità grafite/teal, esclusivamente conversazioni Codex.
-- `src/shared/`: host WPF, ConPTY, storico, statistiche, renderer web.
-- `src/claude/` e `src/codex/`: progetti Windows indipendenti e temi.
-- `tests/`: verifiche dei due launcher, delle sessioni e dei token.
-- `.github/workflows/`: compilazione Windows senza dover installare SDK o npm sul PC aziendale.
+I progetti in `src/claude/` e `src/codex/` compilano lo stesso codice `src/shared/` senza duplicare l'implementazione di ConPTY. Ogni app ha XAML, icona, cache WebView2, storico e processo Windows separati.
 
-I transcript e le credenziali **non** vengono copiati nei repository: Claude e Codex continuano a usare le rispettive directory locali.
+## Versione stabile
 
-Ogni sviluppatore usa la propria cartella locale; per ricevere i commit è sufficiente `git pull --ff-only`.
+**Prima release: v1.0.0.** Due EXE Windows indipendenti, con identità grafica, cache, processi e cronologia separati. Il progetto `powershell-personalizzation` non viene modificato; qui non vengono aggiunti alias o profili globali.
+
+## Build Windows
+
+GitHub Actions compila le due versioni con .NET 10, Node 22 e xterm.js. I pacchetti portabili sono pubblicati come due artifact separati: `ClaudeTerminal-win-x64` e `CodexTerminal-win-x64`. Non serve installare SDK, npm o privilegi amministrativi sul PC di utilizzo. WebView2 Runtime e le rispettive CLI devono essere presenti.
+
+Per una build locale di sviluppo con gli strumenti già disponibili:
+
+```powershell
+Push-Location src/shared/TerminalUi
+npm install
+npm run test:keyboard
+npm run build
+Pop-Location
+dotnet publish src/claude/ClaudeTerminal.csproj -c Release -r win-x64 --self-contained true -o out/ClaudeTerminal
+dotnet publish src/codex/CodexTerminal.csproj -c Release -r win-x64 --self-contained true -o out/CodexTerminal
+```
+
+## Installazione o aggiornamento da GitHub
+
+Non si scaricano ZIP manualmente e non si creano alias PowerShell.
+
+Per installare o aggiornare entrambe le applicazioni, usando soltanto GitHub:
+```powershell
+& '.\scripts\Install-AITerminals.ps1' -App Both
+```
+
+Lo script preferisce l'ultima **GitHub Release stabile**, verifica SHA-256 dei
+pacchetti e aggiorna le due cartelle senza installazioni duplicate. Prima della
+pubblicazione della prima release (o con `-RunId` esplicito) può usare gli
+artifact GitHub Actions. Usa le credenziali GitHub locali già disponibili,
+senza richiedere download ZIP manuali. Per aggiornare un solo programma:
+`-App Claude` oppure `-App Codex`.
+
+La directory di Claude rimane quella esistente
+(`%LOCALAPPDATA%\PowerShellCustomization\ClaudeTerminal`);
+il programma non tocca i dati persistenti di WebView2 né i transcript.
+In presenza di processi attivi o di una cartella sconosciuta interrompe
+l'operazione senza cancellare nulla.
+
+## Funzionalità verificate su Windows
+
+- Avvio delle due finestre contemporaneamente.
+- Sessioni multiple, storico e cambio progetto dentro ogni app.
+- Icona corretta per ciascun EXE e barra delle applicazioni.
+- **Claude:** `Shift+Invio` invia LF (`Ctrl+J`) per una nuova riga.
+- **Codex:** `Shift+Invio`, `Ctrl+Invio` e `Ctrl+J` generano un evento Windows `Ctrl+J` tramite ConPTY. Codex non sempre riconosce il semplice byte LF su Windows.
+- `Invio` resta dedicato all'invio; `Ctrl+C` e `Ctrl+V` mantengono il comportamento standard. Le scorciatoie browser di WebView2 vengono disabilitate **solo in Codex Terminal**, preservando gli appunti.
+- **Titoli Codex:** l'app legge `~/.codex/session_index.jsonl` e preferisce i nomi assegnati tramite `/rename`. Altrimenti legge il primo messaggio `response_item` o `event_msg` nel transcript. Le conversazioni non vengono modificate.
+- GitHub Actions verificano le combinazioni nel renderer e compilano entrambi gli EXE. Il test basso livello `ReadConsoleInputW` non è eseguibile in modo affidabile sul runner senza desktop: il comportamento nella TUI Codex va confermato sul PC Windows.
+- Aggiornamento in-place senza cartelle residue.
+
+## Privacy
+
+L'app legge transcript JSONL locali solo per storico e statistiche di token; **non** trasferisce conversazioni, chiavi API o credenziali al repository. Le statistiche locali non rappresentano quota residua o fatturazione ufficiale.
+
+L'icona Codex in questa fase è un marchio grafico personalizzato grafite/teal, non il logo ufficiale di OpenAI.

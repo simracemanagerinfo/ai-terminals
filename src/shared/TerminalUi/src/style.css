@@ -1,0 +1,14 @@
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body, #terminal-root { width: 100%; height: 100%; padding: 0; margin: 0; overflow: hidden; }
+body { background: #171210; font-family: "Cascadia Mono", Consolas, monospace; }
+#terminal-root { display: flex; position: relative; }
+.term-session { display: none; width: 100%; height: 100%; padding: 12px; background: #171210; }
+.term-session.active { display: block; }
+.term-session .xterm { height: 100%; }
+.term-session .xterm-viewport { background-color: transparent !important; }
+.term-session .xterm-viewport::-webkit-scrollbar { width: 9px; }
+.term-session .xterm-viewport::-webkit-scrollbar-thumb { background: #634538; }
+
+.term-session.codex-session { background: #10191D; }
+.term-session.codex-session .xterm-viewport::-webkit-scrollbar-thumb { background: #346F78; }

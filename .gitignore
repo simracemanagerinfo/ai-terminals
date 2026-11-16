@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+**/node_modules/
+/src/shared/wwwroot/
+/out/
+/dist/
+*.user
+*.suo
+*.log
+.DS_Store
