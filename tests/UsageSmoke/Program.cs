@@ -67,7 +67,36 @@ try
     if (historical.Count != 1 || historical[0].Id != codexId ||
         historical[0].Provider != "Codex" || historical[0].Title != "Codex sample task")
         throw new Exception("Codex history index failed");
-    Console.WriteLine("[PASS] Claude response dedupe; Codex cumulative snapshots/reset; history by project");
+    // Codex versions may persist the first prompt only as response_item.
+    var responseId = Guid.NewGuid().ToString("D");
+    var responsePath = Path.Combine(codexRoot, "sessions", "2026", "11", "16", "rollout-response.jsonl");
+    File.WriteAllLines(responsePath, [
+        JsonSerializer.Serialize(new { type = "session_meta", payload = new { id = responseId, cwd = project } }),
+        JsonSerializer.Serialize(new { type = "response_item", payload = new {
+            type = "message", role = "user",
+            content = new[] { new { type = "input_text", text = "First meaningful Codex prompt" } }
+        }}),
+        JsonSerializer.Serialize(new { type = "response_item", payload = new {
+            type = "message", role = "user",
+            content = new[] { new { type = "input_text", text = "Later prompt must not replace the title" } }
+        }})
+    ]);
+
+    var indexPath = Path.Combine(codexRoot, "session_index.jsonl");
+    File.WriteAllLines(indexPath, [
+        JsonSerializer.Serialize(new { id = codexId, thread_name = "Old session name" }),
+        JsonSerializer.Serialize(new { id = codexId, thread_name = "Mixer test: definitive name" }),
+        "{invalid-json"
+    ]);
+
+    var renamed = CodexHistory.ForProject(project);
+    if (renamed.Count != 2 ||
+        renamed.Single(x => x.Id == codexId).Title != "Mixer test: definitive name" ||
+        renamed.Single(x => x.Id == responseId).Title != "First meaningful Codex prompt")
+        throw new Exception("Codex renamed titles or response_item first-message fallback incorrect");
+
+    Console.WriteLine("[PASS] Claude response dedupe; Codex token snapshots/reset; explicit titles and response_item first prompt");
+
 }
 finally
 {
