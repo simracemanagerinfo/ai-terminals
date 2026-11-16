@@ -1,0 +1,17 @@
+{
+  "name": "ai-terminals-renderer",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "test:keyboard": "node --test ./tests/*.test.js"
+  },
+  "dependencies": {
+    "@xterm/xterm": "6.0.0",
+    "@xterm/addon-fit": "0.11.0"
+  },
+  "devDependencies": {
+    "vite": "7.1.12"
+  }
+}
