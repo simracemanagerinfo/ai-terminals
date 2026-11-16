@@ -102,6 +102,11 @@ public partial class MainWindow : Window
         await TerminalView.EnsureCoreWebView2Async(environment);
         var web = TerminalView.CoreWebView2;
         web.Settings.AreDevToolsEnabled = false;
+        // Ctrl+J is also Edge's Downloads shortcut. In Codex Terminal it
+        // must reach xterm.js rather than being swallowed by WebView2.
+        // Microsoft's setting preserves Ctrl+C/Ctrl+V editing shortcuts.
+        if (TerminalBrand.Provider == "Codex")
+            web.Settings.AreBrowserAcceleratorKeysEnabled = false;
         web.Settings.AreDefaultContextMenusEnabled = false;
         web.Settings.IsStatusBarEnabled = false;
         web.Settings.IsWebMessageEnabled = true;
