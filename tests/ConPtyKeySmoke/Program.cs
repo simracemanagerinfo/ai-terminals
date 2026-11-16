@@ -29,7 +29,10 @@ async Task WaitFor(string expected, int timeoutSeconds = 15)
 
 try
 {
-    using var pty = new ConPtySession(path, "", directory);
+    // Launch the probe under cmd.exe so Windows creates it in the same
+    // pseudo-console, rather than inheriting the headless runner's handles.
+    var arguments = "/Q /C \"\"" + path + "\"\"";
+    using var pty = new ConPtySession("cmd.exe", arguments, directory);
     pty.OutputReceived += text => { lock (guard) output.Append(text); };
     await pty.StartAsync(80, 24);
     await WaitFor("KEYPROBE_READY");
