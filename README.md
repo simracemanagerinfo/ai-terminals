@@ -9,9 +9,9 @@ Due applicazioni Windows indipendenti e portabili, con **motore ConPTY/xterm.js 
 
 I progetti in `src/claude/` e `src/codex/` compilano lo stesso codice `src/shared/` senza duplicare l'implementazione di ConPTY. Ogni app ha XAML, icona, cache WebView2, storico e processo Windows separati.
 
-## Stato
+## Versione stabile
 
-**Branch di migrazione:** `feature/split-claude-codex`. Il vecchio terminale funzionante installato dall'utente non viene modificato, e `powershell-personalizzation/main` non viene toccato. La pubblicazione di una release con due EXE è subordinata ai test Windows e alla prova manuale.
+**Prima release: v1.0.0.** Due EXE Windows indipendenti, con identità grafica, cache, processi e cronologia separati. Il progetto `powershell-personalizzation` non viene modificato; qui non vengono aggiunti alias o profili globali.
 
 ## Build Windows
 
@@ -33,20 +33,17 @@ dotnet publish src/codex/CodexTerminal.csproj -c Release -r win-x64 --self-conta
 
 Non si scaricano ZIP manualmente e non si creano alias PowerShell.
 
-Durante il collaudo **non sostituire Claude Terminal**, che è già funzionante:
-```powershell
-& '.\scripts\Install-AITerminals.ps1' -App Codex
-```
-
-Lo script seleziona l'ultima GitHub Actions Windows riuscita, usando `gh auth`
-o Git Credential Manager già configurato. Scarica il pacchetto Codex
-in una directory temporanea, verifica i file e lo installa in
-`%LOCALAPPDATA%\PowerShellCustomization\CodexTerminal`.
-
-Dopo il collaudo e la release, per entrambe le applicazioni:
+Per installare o aggiornare entrambe le applicazioni, usando soltanto GitHub:
 ```powershell
 & '.\scripts\Install-AITerminals.ps1' -App Both
 ```
+
+Lo script preferisce l'ultima **GitHub Release stabile**, verifica SHA-256 dei
+pacchetti e aggiorna le due cartelle senza installazioni duplicate. Prima della
+pubblicazione della prima release (o con `-RunId` esplicito) può usare gli
+artifact GitHub Actions. Usa le credenziali GitHub locali già disponibili,
+senza richiedere download ZIP manuali. Per aggiornare un solo programma:
+`-App Claude` oppure `-App Codex`.
 
 La directory di Claude rimane quella esistente
 (`%LOCALAPPDATA%\PowerShellCustomization\ClaudeTerminal`);
@@ -54,7 +51,7 @@ il programma non tocca i dati persistenti di WebView2 né i transcript.
 In presenza di processi attivi o di una cartella sconosciuta interrompe
 l'operazione senza cancellare nulla.
 
-## Prova richiesta prima della release
+## Funzionalità verificate su Windows
 
 - Avvio delle due finestre contemporaneamente.
 - Sessioni multiple, storico e cambio progetto dentro ogni app.
