@@ -62,44 +62,45 @@ function Select-Build {
     throw "Nessuna build Windows riuscita disponibile su GitHub."
 }
 
-# Dalla prima release ufficiale usa i pacchetti permanenti.
-# -RunId continua a permettere esplicitamente il collaudo degli artifact CI.
 $release = $null
+# Per l'installazione stabile preferiamo la GitHub Release permanente.
+# Un RunId esplicito permette ancora di testare un artifact GitHub Actions.
 if ($RunId -eq 0) {
     try {
         $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/latest" -Headers $headers -TimeoutSec 45 -ErrorAction Stop
     }
     catch {
-        # La prima release potrebbe non essere ancora pubblicata.
-        # In tal caso conserva il workflow precedente basato su GitHub Actions.
-        if ([int]$_.Exception.Response.StatusCode -ne 404) { throw }
+        if ($null -eq $_.Exception.Response -or
+            [int]$_.Exception.Response.StatusCode -ne 404) { throw }
     }
 }
 
 if ($null -eq $release) {
     $run = Select-Build
     if ($run.status -ne 'completed' -or $run.conclusion -ne 'success') {
-        throw "Il workflow $($run.id) non è riuscito: installazione annullata."
+        throw "Il workflow $($run.id) non e riuscito: installazione annullata."
     }
     $index = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/actions/runs/$($run.id)/artifacts?per_page=100" -Headers $headers -TimeoutSec 45
 }
 else {
     $checksumAsset = @($release.assets | Where-Object { $_.name -eq 'SHA256SUMS.txt' } | Select-Object -First 1)
-    if ($checksumAsset.Count -ne 1) { throw 'Release priva di checksum SHA256: installazione annullata.' }
-    # Repository pubblico: non inoltrare token GitHub verso URL di download esterni.
+    if ($checksumAsset.Count -ne 1) {
+        throw "GitHub Release $($release.tag_name) priva di SHA256SUMS.txt"
+    }
+    # I download delle release pubbliche non ricevono il token GitHub.
     $checksumText = (Invoke-WebRequest -Uri $checksumAsset[0].browser_download_url -TimeoutSec 45 -ErrorAction Stop).Content
 }
 $apps = if ($App -eq 'Both') { @('Claude','Codex') } else { @($App) }
 
 foreach ($agent in $apps) {
     $exeName = "${agent}Terminal.exe"
-    $artifactName = "${agent}Terminal-win-x64"
-    if ($release) {
+    $artifactName = "$($agent)Terminal-win-x64"
+    if ($null -ne $release) {
         $artifact = @($release.assets | Where-Object {
             $_.name -eq "$artifactName.zip" -and $_.state -eq 'uploaded'
         } | Select-Object -First 1)
         if ($artifact.Count -ne 1) {
-            throw "Pacchetto non presente nella release $($release.tag_name): $artifactName.zip"
+            throw "Pacchetto non disponibile nella release $($release.tag_name): $artifactName.zip"
         }
     }
     else {
@@ -107,7 +108,7 @@ foreach ($agent in $apps) {
             $_.name -eq $artifactName -and -not $_.expired
         } | Select-Object -First 1)
         if ($artifact.Count -ne 1) {
-            throw "Artifact mancante o scaduto: $artifactName, run $($run.id). Nessun file modificato."
+            throw "Artifact non disponibile: $artifactName, run $($run.id)"
         }
     }
     if ([long]$artifact[0].size_in_bytes -le 0 -or [long]$artifact[0].size_in_bytes -gt 512MB) {
@@ -133,58 +134,19 @@ foreach ($agent in $apps) {
 
     try {
         New-Item -ItemType Directory -Path $stage -Force | Out-Null
-        if ($release) {
-            $uri = $artifact[0].browser_download_url
+        if ($null -ne $release) {
             Write-Host "GitHub Release $($release.tag_name): $artifactName.zip" -ForegroundColor Cyan
-            Invoke-WebRequest -Uri $uri -OutFile $archive -MaximumRedirection 5 -TimeoutSec 240 -ErrorAction Stop | Out-Null
+            Invoke-WebRequest -Uri $artifact[0].browser_download_url -OutFile $archive -MaximumRedirection 5 -TimeoutSec 240 -ErrorAction Stop | Out-Null
 
-            $expectedLine = @($checksumText -split '\r?\n' | Where-Object {
-                $_ -match ('^[0-9a-fA-F]{64}\s+' + [regex]::Escape("$artifactName.zip") + '
-        $required = @(
-            $exeName,
-            'wwwroot\index.html',
-            "scripts\Start-${agent}Session.ps1",
-            "assets\$($agent.ToLowerInvariant())-terminal.png"
-        )
-        foreach ($file in $required) {
-            if (-not (Test-Path -LiteralPath (Join-Path $stage $file) -PathType Leaf)) {
-                throw "Pacchetto incompleto per $agent (manca $file). Versione precedente conservata."
+            $checksumPattern = '^(?<hash>[0-9a-fA-F]{64})\s+' + [regex]::Escape("$artifactName.zip") + '$'
+            $lines = @($checksumText -split '\r?\n' | Where-Object { $_ -match $checksumPattern } | Select-Object -First 1)
+            if ($lines.Count -ne 1) {
+                throw "Checksum mancante nella release per $artifactName.zip."
             }
-        }
-        if (Test-Path -LiteralPath $dest) {
-            Rename-Item -LiteralPath $dest -NewName $backupName -ErrorAction Stop
-            $backedUp = $true
-        }
-        Rename-Item -LiteralPath $stage -NewName ("${agent}Terminal") -ErrorAction Stop
-        $installed = $true
-        Write-Host "[OK] $exeName aggiornato in $dest" -ForegroundColor Green
-    }
-    catch {
-        if ($backedUp -and -not (Test-Path -LiteralPath $dest)) {
-            Rename-Item -LiteralPath $backup -NewName ("${agent}Terminal") -ErrorAction Stop
-            $backedUp = $false
-        }
-        throw
-    }
-    finally {
-        if (Test-Path -LiteralPath $archive) { Remove-Item -LiteralPath $archive -Force -ErrorAction SilentlyContinue }
-        if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue }
-        if ($installed -and $backedUp -and (Test-Path -LiteralPath $backup)) {
-            try { Remove-Item -LiteralPath $backup -Recurse -Force -ErrorAction Stop }
-            catch { Write-Warning "Vecchio backup da rimuovere manualmente: $backup" }
-        }
-    }
-}
-Write-Host '[OK] Nessun alias aggiunto. Puoi fissare gli EXE alla barra delle applicazioni.' -ForegroundColor Green
-)
-            } | Select-Object -First 1)
-            if ($expectedLine.Count -ne 1) {
-                throw "Checksum mancante per $artifactName.zip nella release."
-            }
-            $expectedHash = ($expectedLine[0] -split '\s+')[0].ToLowerInvariant()
+            $expectedHash = ($lines[0] -split '\s+')[0].ToLowerInvariant()
             $actualHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
             if ($actualHash -ne $expectedHash) {
-                throw "Checksum SHA256 non corrispondente per $artifactName.zip. Installazione annullata."
+                throw "Checksum SHA256 non corrispondente per $artifactName.zip."
             }
         }
         else {
