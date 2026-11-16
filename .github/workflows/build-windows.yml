@@ -106,9 +106,8 @@ jobs:
           }
           Write-Host '[PASS] Two distinct portable Windows apps with independent brands'
 
-      - name: Probe Windows Ctrl+J key record through ConPTY (diagnostic)
+      - name: Verify Windows Ctrl+J key record through ConPTY
         id: win32_key_probe
-        continue-on-error: true
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
