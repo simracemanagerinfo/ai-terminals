@@ -13,4 +13,4 @@ Due applicazioni Windows indipendenti per **Claude Code** e **OpenAI Codex CLI**
 
 I transcript e le credenziali **non** vengono copiati nei repository: Claude e Codex continuano a usare le rispettive directory locali.
 
-La directory locale prevista è `C:\Users\Overdata\Documents\workspace\personale\ai-terminals`, già clonata dall'utente; per ricevere i commit basta `git pull --ff-only`.
+Ogni sviluppatore usa la propria cartella locale; per ricevere i commit è sufficiente `git pull --ff-only`.
