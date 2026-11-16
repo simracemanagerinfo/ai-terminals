@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>ClaudeTerminal</AssemblyName>
+    <RootNamespace>ClaudeTerminal.Host</RootNamespace>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <EnableDefaultPageItems>false</EnableDefaultPageItems>
+    <ApplicationIcon>obj\ClaudeTerminal.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\shared\*.cs" />
+    <Compile Include="TerminalBrand.cs" />
+    <ApplicationDefinition Include="..\shared\App.xaml" Link="App.xaml" />
+    <Page Include="MainWindow.xaml" />
+    <Page Include="UsageWindow.xaml" />
+    <Content Include="..\shared\wwwroot\**\*">
+      <Link>wwwroot\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Start-ClaudeSession.ps1">
+      <Link>scripts\Start-ClaudeSession.ps1</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="assets\claude-terminal.png">
+      <Link>assets\claude-terminal.png</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <Target Name="GenerateNativeIcon" BeforeTargets="PrepareForBuild"
+          Inputs="assets\claude-terminal.png"
+          Outputs="obj\ClaudeTerminal.ico">
+    <Exec Command="pwsh -NoLogo -NoProfile -File &quot;$(MSBuildProjectDirectory)\..\shared\Build-Icon.ps1&quot; -Source &quot;$(MSBuildProjectDirectory)\assets\claude-terminal.png&quot; -Destination &quot;$(MSBuildProjectDirectory)\obj\ClaudeTerminal.ico&quot;" />
+  </Target>
+</Project>
