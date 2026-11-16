@@ -47,7 +47,8 @@ $token = $null
 
 function Select-Build {
     if ($RunId -gt 0) {
-        return Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/actions/runs/$RunId" -Headers $headers -TimeoutSec 45
+        $selected = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/actions/runs/$RunId" -Headers $headers -TimeoutSec 45
+        return $selected
     }
     foreach ($branch in @('main','feature/split-claude-codex')) {
         $url = "https://api.github.com/repos/$repo/actions/runs?branch=$([uri]::EscapeDataString($branch))&status=success&per_page=20"
