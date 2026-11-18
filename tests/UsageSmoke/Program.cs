@@ -147,6 +147,23 @@ try
     if (ClaudeTitle(autoId) != "New title after live rename")
         throw new Exception("Claude live title refresh did not invalidate the transcript cache");
 
+    // Each Codex window has its own short completion-marker file.
+    // Read new turns exactly once; multiple completions are allowed.
+    var signalsPath = Path.Combine(home, "codex-turns.signals");
+    int readCount = 0;
+    var seen = new HashSet<string>(StringComparer.Ordinal);
+    if (CodexCompletionSignals.ReadNewTurnIds(signalsPath, ref readCount, seen).Count != 0)
+        throw new Exception("Missing signal file should produce no notifications");
+    File.WriteAllLines(signalsPath, ["turn-1", "turn-1"]);
+    var first = CodexCompletionSignals.ReadNewTurnIds(signalsPath, ref readCount, seen);
+    if (first.Count != 1 || first[0] != "turn-1")
+        throw new Exception("Duplicate completion event was not suppressed");
+    File.AppendAllLines(signalsPath, ["turn-2", "turn-3"]);
+    var second = CodexCompletionSignals.ReadNewTurnIds(signalsPath, ref readCount, seen);
+    if (second.Count != 2 || second[0] != "turn-2" || second[1] != "turn-3" ||
+        CodexCompletionSignals.ReadNewTurnIds(signalsPath, ref readCount, seen).Count != 0)
+        throw new Exception("Incremental turn completions were lost or replayed");
+
     Console.WriteLine("[PASS] Claude response dedupe; Codex token snapshots/reset; Claude stored titles, explicit Codex titles and response_item fallback");
 
 }
