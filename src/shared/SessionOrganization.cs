@@ -180,6 +180,9 @@ public sealed class SessionOrganization
         if (clean.Length is < 1 or > 60 ||
             clean.IndexOfAny(['\r', '\n', '\t']) >= 0)
             throw new ArgumentException("Folder name must contain 1–60 characters on one line.");
+        if (new[] { "Bin", "Secchio", "Unorganized", "Non organizzate" }
+            .Any(reserved => reserved.Equals(clean, StringComparison.OrdinalIgnoreCase)))
+            throw new ArgumentException("Reserved folder name.");
         return clean;
     }
 
