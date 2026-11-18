@@ -48,6 +48,9 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         ConversationsList.ItemsSource = _sidebar;
+        // Pre-attach an empty menu: WPF may not open a context menu on the
+        // first right-click when ContextMenu is initially null.
+        ConversationsList.ContextMenu = new ContextMenu();
         NewSessionButton.IsEnabled = false;
         NewFolderButton.IsEnabled = false;
         try { _organization = SessionOrganization.ForAgent(TerminalBrand.Provider); }
@@ -788,7 +791,8 @@ public partial class MainWindow : Window
             _project is null)
         { e.Handled = true; return; }
 
-        var menu = new ContextMenu();
+        var menu = ConversationsList.ContextMenu ?? new ContextMenu();
+        menu.Items.Clear();
         MenuItem Item(string title, Action action)
         {
             var item = new MenuItem { Header = title };
