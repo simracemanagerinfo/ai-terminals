@@ -44,6 +44,47 @@ try {
     if (Test-Path -LiteralPath $env:CLAUDE_TERMINAL_TEST_LOG) {
         throw 'Conflicting IDs reached Claude CLI'
     }
+    # The Claude Stop hook must be scoped to the launched session.
+    $signal = Join-Path $temp 'claude-completions.signals'
+    $hook = Join-Path $PSScriptRoot '..\src\claude\Notify-ClaudeTurn.ps1'
+    Remove-Item -LiteralPath $env:CLAUDE_TERMINAL_TEST_LOG -Force -ErrorAction SilentlyContinue
+    & pwsh.exe -NoLogo -NoProfile -File $launcher -ProjectPath $project -NewSessionId $newId -CompletionSignalPath $signal | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Claude notify-enabled launcher failed' }
+    $captured = (Get-Content -LiteralPath $env:CLAUDE_TERMINAL_TEST_LOG -Raw).Trim()
+    if (-not $captured.Contains('--settings') -or
+        -not $captured.Contains('Notify-ClaudeTurn.ps1') -or
+        -not $captured.Contains('--session-id')) {
+        throw "Claude Stop hook not passed to CLI: $captured"
+    }
+    Remove-Item -LiteralPath $env:CLAUDE_TERMINAL_TEST_LOG -Force
+    & pwsh.exe -NoLogo -NoProfile -File $launcher -ProjectPath $project -SessionId $oldId -CompletionSignalPath $signal | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Claude notify-enabled resume failed' }
+    $captured = (Get-Content -LiteralPath $env:CLAUDE_TERMINAL_TEST_LOG -Raw).Trim()
+    if (-not $captured.Contains('--settings') -or -not $captured.Contains("--resume $oldId")) {
+        throw "Claude resume lost Stop hook or session ID: $captured"
+    }
+
+    # No reply data should be copied to disk. Other events are ignored.
+    '{"hook_event_name":"Stop","session_id":"example","last_assistant_message":"secret"}' |
+        & pwsh.exe -NoLogo -NoProfile -File $hook -SignalPath $signal
+    '{"hook_event_name":"SubagentStop","session_id":"example"}' |
+        & pwsh.exe -NoLogo -NoProfile -File $hook -SignalPath $signal
+    $lines = @(Get-Content -LiteralPath $signal)
+    if ($lines.Count -ne 1 -or $lines[0] -notmatch '^[0-9a-f]{32}
+    # Actions interpretera come fallimento anche se tutte le asserzioni sono OK.
+    $global:LASTEXITCODE = 0
+    Write-Host '[PASS] Claude CLI launch/resume plus private Stop hook and completion markers.' -ForegroundColor Green
+}
+finally {
+    $env:PATH = $originalPath
+    $env:CLAUDE_TERMINAL_TEST_LOG = $originalLog
+    Remove-Item -LiteralPath $temp -Force -Recurse -ErrorAction SilentlyContinue
+}
+ -or
+        (Get-Content -LiteralPath $signal -Raw).Contains('secret')) {
+        throw 'Claude Stop hook did not record a private completion marker'
+    }
+
     # Il caso negativo lascia LASTEXITCODE=1 nel processo di test, che GitHub
     # Actions interpretera come fallimento anche se tutte le asserzioni sono OK.
     $global:LASTEXITCODE = 0
