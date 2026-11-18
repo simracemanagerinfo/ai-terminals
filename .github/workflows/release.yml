@@ -1,4 +1,4 @@
-name: Publish AI Terminals v1.0.0
+name: Publish AI Terminals v1.0.1
 
 on:
   workflow_run:
@@ -75,14 +75,14 @@ jobs:
           }
           $checksums | Set-Content -LiteralPath 'release-assets/SHA256SUMS.txt' -Encoding ascii
 
-      - name: Publish stable GitHub Release v1.0.0
+      - name: Publish stable GitHub Release v1.0.1
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           $ErrorActionPreference = 'Stop'
-          gh release create v1.0.0 'release-assets/ClaudeTerminal-win-x64.zip' 'release-assets/CodexTerminal-win-x64.zip' 'release-assets/SHA256SUMS.txt' --repo $env:GITHUB_REPOSITORY --target $env:TESTED_SHA --title 'AI Terminals v1.0.0' --notes-file 'docs/releases/v1.0.0.md' --latest
+          gh release create v1.0.1 'release-assets/ClaudeTerminal-win-x64.zip' 'release-assets/CodexTerminal-win-x64.zip' 'release-assets/SHA256SUMS.txt' --repo $env:GITHUB_REPOSITORY --target $env:TESTED_SHA --title 'AI Terminals v1.0.1' --notes-file 'docs/releases/v1.0.1.md' --latest
           if ($LASTEXITCODE -ne 0) {
             throw "GitHub release publication failed ($LASTEXITCODE)"
           }

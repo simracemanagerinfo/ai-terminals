@@ -95,7 +95,59 @@ try
         renamed.Single(x => x.Id == responseId).Title != "First meaningful Codex prompt")
         throw new Exception("Codex renamed titles or response_item first-message fallback incorrect");
 
-    Console.WriteLine("[PASS] Claude response dedupe; Codex token snapshots/reset; explicit titles and response_item first prompt");
+    // Claude can save session titles long after the first user prompt. The
+    // terminal must prefer explicit renames, then AI-generated and indexed
+    // summaries, and only then the first prompt.
+    var claudeFolder = Path.GetDirectoryName(claudePath)!;
+    string ClaudePath(string id) => Path.Combine(claudeFolder, id + ".jsonl");
+    string ClaudeUser(string prompt) => JsonSerializer.Serialize(new {
+        type = "user", cwd = project, message = new { content = prompt }
+    });
+    var customId = Guid.NewGuid().ToString("D");
+    var autoId = Guid.NewGuid().ToString("D");
+    var indexId = Guid.NewGuid().ToString("D");
+    var fallbackId = Guid.NewGuid().ToString("D");
+
+    var longTranscript = new List<string> { ClaudeUser("First question is not the title") };
+    longTranscript.AddRange(Enumerable.Repeat("{\"type\":\"progress\"}", 500));
+    longTranscript.Add(JsonSerializer.Serialize(new { type = "ai-title", sessionId = customId,
+        aiTitle = "Claude generated title" }));
+    longTranscript.Add(JsonSerializer.Serialize(new { type = "custom-title", sessionId = customId,
+        customTitle = "Old manual title" }));
+    longTranscript.Add("{incomplete-json");
+    longTranscript.Add(JsonSerializer.Serialize(new { type = "custom-title", sessionId = customId,
+        customTitle = "Final renamed title" }));
+    File.WriteAllLines(ClaudePath(customId), longTranscript);
+    File.WriteAllLines(ClaudePath(autoId), [
+        ClaudeUser("Another long first question"),
+        JsonSerializer.Serialize(new { type = "ai-title", sessionId = autoId,
+            aiTitle = "AI-generated task title" })
+    ]);
+    File.WriteAllLines(ClaudePath(indexId), [ClaudeUser("Index prompt should not appear")]);
+    File.WriteAllLines(ClaudePath(fallbackId), [ClaudeUser("First prompt fallback")]);
+
+    File.WriteAllText(Path.Combine(claudeFolder, "sessions-index.json"),
+        JsonSerializer.Serialize(new { entries = new object[] {
+            new { sessionId = customId, customTitle = "Stale indexed title", summary = "Indexed custom summary" },
+            new { sessionId = autoId, summary = "Older indexed auto-summary" },
+            new { sessionId = indexId, summary = "Indexed session summary" }
+        }}));
+    string ClaudeTitle(string id) => SessionHistory.ForProject(project).Single(x => x.Id == id).Title;
+    if (ClaudeTitle(customId) != "Final renamed title" ||
+        ClaudeTitle(autoId) != "AI-generated task title" ||
+        ClaudeTitle(indexId) != "Indexed session summary" ||
+        ClaudeTitle(fallbackId) != "First prompt fallback")
+        throw new Exception("Claude title precedence, long transcript scanning or first-prompt fallback failed");
+
+    // Re-reading an unchanged file is cached; appending a title invalidates it.
+    File.AppendAllLines(ClaudePath(autoId), [
+        JsonSerializer.Serialize(new { type = "custom-title", sessionId = autoId,
+            customTitle = "New title after live rename" })
+    ]);
+    if (ClaudeTitle(autoId) != "New title after live rename")
+        throw new Exception("Claude live title refresh did not invalidate the transcript cache");
+
+    Console.WriteLine("[PASS] Claude response dedupe; Codex token snapshots/reset; Claude stored titles, explicit Codex titles and response_item fallback");
 
 }
 finally
