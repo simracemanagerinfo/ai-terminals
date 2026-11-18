@@ -57,6 +57,7 @@ jobs:
               "scripts/Start-$($agent)Session.ps1",
               "assets/$($agent.ToLowerInvariant())-terminal.png"
             )
+            if ($agent -eq 'Codex') { $required += 'scripts/Notify-CodexTurn.ps1' }
             foreach ($relative in $required) {
               $check = Join-Path $source $relative
               if (-not (Test-Path -LiteralPath $check -PathType Leaf)) {
