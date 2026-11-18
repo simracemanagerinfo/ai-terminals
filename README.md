@@ -11,7 +11,7 @@ I progetti in `src/claude/` e `src/codex/` compilano lo stesso codice `src/share
 
 ## Versione stabile
 
-**Prima release: v1.0.0.** Due EXE Windows indipendenti, con identità grafica, cache, processi e cronologia separati. Il progetto `powershell-personalizzation` non viene modificato; qui non vengono aggiunti alias o profili globali.
+**Release stabile attuale: v1.0.1** (prima versione: v1.0.0). Due EXE Windows indipendenti, con identità grafica, cache, processi e cronologia separati. Il progetto `powershell-personalizzation` non viene modificato; qui non vengono aggiunti alias o profili globali.
 
 ## Build Windows
 
@@ -59,6 +59,7 @@ l'operazione senza cancellare nulla.
 - **Claude:** `Shift+Invio` invia LF (`Ctrl+J`) per una nuova riga.
 - **Codex:** `Shift+Invio`, `Ctrl+Invio` e `Ctrl+J` generano un evento Windows `Ctrl+J` tramite ConPTY. Codex non sempre riconosce il semplice byte LF su Windows.
 - `Invio` resta dedicato all'invio; `Ctrl+C` e `Ctrl+V` mantengono il comportamento standard. Le scorciatoie browser di WebView2 vengono disabilitate **solo in Codex Terminal**, preservando gli appunti.
+- **Titoli Claude:** lo storico preferisce l'ultima rinomina `/rename`, poi il titolo `ai-title`, poi il riepilogo disponibile e infine la prima domanda. Legge i metadati locali senza modificare le conversazioni.
 - **Titoli Codex:** l'app legge `~/.codex/session_index.jsonl` e preferisce i nomi assegnati tramite `/rename`. Altrimenti legge il primo messaggio `response_item` o `event_msg` nel transcript. Le conversazioni non vengono modificate.
 - GitHub Actions verificano le combinazioni nel renderer e compilano entrambi gli EXE. Il test basso livello `ReadConsoleInputW` non è eseguibile in modo affidabile sul runner senza desktop: il comportamento nella TUI Codex va confermato sul PC Windows.
 - Aggiornamento in-place senza cartelle residue.
