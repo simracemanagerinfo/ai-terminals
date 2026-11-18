@@ -5,6 +5,8 @@ $temp = Join-Path $env:TEMP ('claude-terminal-cli-tests-' + [Guid]::NewGuid().To
 $launcher = Join-Path $PSScriptRoot '..\src\claude\Start-ClaudeSession.ps1'
 $originalPath = $env:PATH
 $originalLog = $env:CLAUDE_TERMINAL_TEST_LOG
+$originalChecker = $env:CLAUDE_SETTINGS_CHECKER
+$originalCheckLog = $env:CLAUDE_SETTINGS_CHECK_LOG
 
 try {
     $project = Join-Path $temp 'test project'
@@ -14,10 +16,14 @@ try {
     Set-Content -LiteralPath $mock -Encoding ascii -Value @(
         '@echo off'
         'echo Args:%* > "%CLAUDE_TERMINAL_TEST_LOG%"'
-        'exit /b 0'
+        'if /I not "%~1"=="--settings" exit /b 0'
+        'pwsh.exe -NoLogo -NoProfile -File "%CLAUDE_SETTINGS_CHECKER%" -SettingsPath "%~2"'
+        'exit /b %ERRORLEVEL%'
     )
     $env:PATH = "$bin;$originalPath"
     $env:CLAUDE_TERMINAL_TEST_LOG = Join-Path $temp 'claude-args.txt'
+    $env:CLAUDE_SETTINGS_CHECKER = Join-Path $PSScriptRoot 'Inspect-ClaudeSettings.ps1'
+    $env:CLAUDE_SETTINGS_CHECK_LOG = Join-Path $temp 'settings-checked.txt'
     $newId = [guid]::NewGuid().ToString('D')
     $oldId = [guid]::NewGuid().ToString('D')
 
@@ -52,9 +58,14 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Claude notify-enabled launcher failed' }
     $captured = (Get-Content -LiteralPath $env:CLAUDE_TERMINAL_TEST_LOG -Raw).Trim()
     if (-not $captured.Contains('--settings') -or
-        -not $captured.Contains('Notify-ClaudeTurn.ps1') -or
+        -not $captured.Contains('.json') -or
         -not $captured.Contains('--session-id')) {
-        throw "Claude Stop hook not passed to CLI: $captured"
+        throw "Claude settings file not passed to CLI: $captured"
+    }
+    $validatedPaths = @(Get-Content -LiteralPath $env:CLAUDE_SETTINGS_CHECK_LOG)
+    if ($validatedPaths.Count -ne 1 -or
+        (Test-Path -LiteralPath $validatedPaths[0])) {
+        throw 'Claude new-chat temporary settings JSON was not validated or cleaned up'
     }
     Remove-Item -LiteralPath $env:CLAUDE_TERMINAL_TEST_LOG -Force
     & pwsh.exe -NoLogo -NoProfile -File $launcher -ProjectPath $project -SessionId $oldId -CompletionSignalPath $signal | Out-Null
@@ -62,6 +73,12 @@ try {
     $captured = (Get-Content -LiteralPath $env:CLAUDE_TERMINAL_TEST_LOG -Raw).Trim()
     if (-not $captured.Contains('--settings') -or -not $captured.Contains("--resume $oldId")) {
         throw "Claude resume lost Stop hook or session ID: $captured"
+    }
+    $validatedPaths = @(Get-Content -LiteralPath $env:CLAUDE_SETTINGS_CHECK_LOG)
+    if ($validatedPaths.Count -ne 2 -or
+        $validatedPaths[0] -eq $validatedPaths[1] -or
+        (Test-Path -LiteralPath $validatedPaths[1])) {
+        throw 'Claude resume settings JSON was not validated or uniquely cleaned up'
     }
 
     # The marker file must never receive private reply text.
@@ -83,5 +100,7 @@ try {
 finally {
     $env:PATH = $originalPath
     $env:CLAUDE_TERMINAL_TEST_LOG = $originalLog
+    $env:CLAUDE_SETTINGS_CHECKER = $originalChecker
+    $env:CLAUDE_SETTINGS_CHECK_LOG = $originalCheckLog
     Remove-Item -LiteralPath $temp -Force -Recurse -ErrorAction SilentlyContinue
 }
