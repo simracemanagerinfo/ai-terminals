@@ -45,6 +45,7 @@ jobs:
           $paths = @(
             'scripts/Install-AITerminals.ps1',
             'src/claude/Start-ClaudeSession.ps1',
+            'src/claude/Notify-ClaudeTurn.ps1',
             'src/codex/Start-CodexSession.ps1',
             'src/codex/Notify-CodexTurn.ps1'
           )
@@ -96,6 +97,7 @@ jobs:
             'out/ClaudeTerminal/ClaudeTerminal.exe',
             'out/ClaudeTerminal/wwwroot/index.html',
             'out/ClaudeTerminal/scripts/Start-ClaudeSession.ps1',
+            'out/ClaudeTerminal/scripts/Notify-ClaudeTurn.ps1',
             'out/ClaudeTerminal/assets/claude-terminal.png',
             'out/CodexTerminal/CodexTerminal.exe',
             'out/CodexTerminal/wwwroot/index.html',
