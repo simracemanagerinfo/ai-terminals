@@ -64,6 +64,16 @@ l'operazione senza cancellare nulla.
 - GitHub Actions verificano le combinazioni nel renderer e compilano entrambi gli EXE. Il test basso livello `ReadConsoleInputW` non è eseguibile in modo affidabile sul runner senza desktop: il comportamento nella TUI Codex va confermato sul PC Windows.
 - Aggiornamento in-place senza cartelle residue.
 
+## Anteprima: avviso risposta completata (Codex)
+
+- Quando Codex termina un turno con l'evento nativo `agent-turn-complete`, il terminale contrassegna la conversazione con un indicatore e un bordo colorato.
+- Se Codex Terminal non è in primo piano o è minimizzato, Windows riceve una notifica tramite l'area di notifica (`NotifyIcon`). La notifica non attiva la finestra; cliccandola si può tornare alla conversazione.
+- Se la finestra è in primo piano, non ci sono popup: resta solo l'evidenziazione della chat.
+- L'indicatore resta visibile finché selezioni o usi quella conversazione. Le altre chat non vengono azzerate.
+- Si usano segnali temporanei separati per ogni sessione, senza leggere il testo delle risposte o creare notifiche per vecchie conversazioni.
+- La CLI Codex viene avviata con un parametro `-c notify=[...]` **solo per il processo lanciato dal terminale**. Non viene modificato `~/.codex/config.toml`; tuttavia, un eventuale `notify` già configurato dall'utente viene **sostituito per quella specifica sessione**. Valutare questo vincolo prima di integrare il ramo nella release stabile.
+- Le notifiche dipendono dalle impostazioni di Windows, compresa la modalità Non disturbare.
+
 ## Privacy
 
 L'app legge transcript JSONL locali solo per storico e statistiche di token; **non** trasferisce conversazioni, chiavi API o credenziali al repository. Le statistiche locali non rappresentano quota residua o fatturazione ufficiale.
