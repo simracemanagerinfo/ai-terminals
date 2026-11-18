@@ -151,7 +151,7 @@ public partial class MainWindow : Window
         web.NewWindowRequested += (_, args) => { args.Handled = true; };
         web.WebMessageReceived += OnWebMessage;
         TerminalView.Source = new Uri("https://claude-terminal.local/index.html");
-        FooterStatus.Text = "Caricamento terminale xterm...";
+        FooterStatus.Text = UiText.T("rendererLoading");
     }
 
     private async void OnWebMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
@@ -171,7 +171,7 @@ public partial class MainWindow : Window
                 case "ready":
                     _webReady = true;
                     NewSessionButton.IsEnabled = _project is not null;
-                    FooterStatus.Text = "Renderer pronto. Apri due conversazioni per verificare lo switching.";
+                    FooterStatus.Text = UiText.T("rendererReady");
                     break;
                 case "input":
                     if (id is not null && _sessions.TryGetValue(id, out var active) &&
@@ -202,7 +202,7 @@ public partial class MainWindow : Window
                         if (clipboardText.Length > 0 && clipboardText.Length <= 2_000_000)
                             Send(new { type = "clipboard-paste", id, data = clipboardText });
                         else if (clipboardText.Length > 2_000_000)
-                            FooterStatus.Text = "Appunti troppo grandi per incollarli nel terminale.";
+                            FooterStatus.Text = UiText.T("clipboardTooLarge");
                     }
                     break;
                 case "resize":
@@ -219,7 +219,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            FooterStatus.Text = "Errore comunicazione terminale: " + ex.Message;
+            FooterStatus.Text = UiText.T("terminalProtocolError", ex.Message);
         }
     }
 
@@ -274,13 +274,13 @@ public partial class MainWindow : Window
     {
         if (!_webReady || _project is null)
         {
-            ShowError("Scegli un progetto e attendi che il renderer sia pronto.");
+            ShowError(UiText.T("chooseProject"));
             return;
         }
         var provider = TerminalBrand.Provider;
         if (existing is not null && existing.Provider != provider)
         {
-            ShowError("La conversazione appartiene a un altro agente.");
+            ShowError(UiText.T("wrongProvider"));
             return;
         }
         if (existing is not null)
@@ -291,12 +291,12 @@ public partial class MainWindow : Window
             if (liveMatch is not null)
             {
                 UpdateSidebar(preferredTerminalId: liveMatch.Id);
-                FooterStatus.Text = "Conversazione già attiva: mostrato il terminale esistente.";
+                FooterStatus.Text = UiText.T("alreadyActive");
                 return;
             }
             if (!StringComparer.OrdinalIgnoreCase.Equals(existing.Directory, _project))
             {
-                ShowError("La conversazione selezionata non appartiene al progetto attivo.");
+                ShowError(UiText.T("wrongProject"));
                 return;
             }
         }
@@ -305,7 +305,7 @@ public partial class MainWindow : Window
             TerminalBrand.Launcher);
         if (!diagnosticShell && !File.Exists(script))
         {
-            ShowError("Script Claude mancante nel pacchetto: " + script);
+            ShowError(UiText.T("cliMissing", TerminalBrand.Provider, script));
             return;
         }
         // Claude supports --session-id; Codex currently creates its own UUID.
@@ -327,8 +327,8 @@ public partial class MainWindow : Window
             command += " -CompletionSignalPath " + QuoteWindowsArgument(completionSignalPath);
         var pty = new ConPtySession("pwsh.exe", command, _project);
         var label = diagnosticShell
-            ? ("Shell diagnostica " + DateTime.Now.ToString("HH:mm:ss"))
-            : existing?.Title ?? ("Nuova chat " + DateTime.Now.ToString("HH:mm:ss"));
+            ? UiText.T("diagnosticShell", DateTime.Now.ToString("HH:mm:ss"))
+            : existing?.Title ?? UiText.T("newChatLabel", DateTime.Now.ToString("HH:mm:ss"));
         var item = new LiveItem(id, label, claudeId, _project, pty, provider, completionSignalPath);
         _sessions.Add(id, item);
         _live.Add(item);
@@ -344,7 +344,7 @@ public partial class MainWindow : Window
             item.Status = "Errore I/O";
             UpdateSidebar();
             if (_visibleTerminalId == id)
-                FooterStatus.Text = "Connessione ConPTY interrotta; processo da verificare: " + message;
+                FooterStatus.Text = UiText.T("connectionFault", message);
         });
         pty.Exited += code => Dispatcher.BeginInvoke(() =>
         {
@@ -354,8 +354,8 @@ public partial class MainWindow : Window
             Send(new { type = "exited", id, code });
             if (_visibleTerminalId == id)
                 FooterStatus.Text = code == -1
-                    ? "Il processo si è chiuso; codice di uscita non disponibile."
-                    : "Processo terminato (codice " + code + ").";
+                    ? UiText.T("processNoCode")
+                    : UiText.T("processExit", code);
         });
 
         try
@@ -365,7 +365,7 @@ public partial class MainWindow : Window
             if (item.Status == "Avvio")
                 item.Status = "In esecuzione";
             UpdateSidebar();
-            FooterStatus.Text = "Terminale " + TerminalBrand.Provider + " integrato avviato.";
+            FooterStatus.Text = UiText.T("terminalStarted", TerminalBrand.Provider);
         }
         catch (Exception ex)
         {
@@ -373,19 +373,19 @@ public partial class MainWindow : Window
             UpdateSidebar();
             Send(new { type = "output", id, data = "\r\n[HOST] " + ex.Message + "\r\n" });
             pty.Dispose();
-            FooterStatus.Text = "Errore avvio " + provider + ": " + ex.Message;
+            FooterStatus.Text = UiText.T("terminalStartError", provider, ex.Message);
         }
     }
 
     private async Task SetProjectAsync(string path)
     {
-        if (!Directory.Exists(path)) { ShowError("La directory non esiste: " + path); return; }
+        if (!Directory.Exists(path)) { ShowError(UiText.T("projectMissing", path)); return; }
         _project = Path.GetFullPath(path);
         ProjectCombo.Text = _project;
         SessionHistory.SaveProject(_project);
         NewSessionButton.IsEnabled = _webReady;
-        SideStatus.Text = "Progetto: " + _project + "\n" +
-                          "Le sessioni già aperte restano attive cambiando progetto.";
+        NewFolderButton.IsEnabled = _organization is not null;
+        SideStatus.Text = UiText.T("sideProject", _project);
         // Non mostrare lo storico del progetto precedente durante la nuova indicizzazione.
         _history = [];
         UpdateSidebar();
@@ -397,7 +397,7 @@ public partial class MainWindow : Window
         if (_project is null) return;
         var project = _project;
         var version = ++_historyGeneration;
-        if (!silent) FooterStatus.Text = "Indicizzazione conversazioni locali...";
+        if (!silent) FooterStatus.Text = UiText.T("indexing");
         try
         {
             var items = await Task.Run(() =>
@@ -421,11 +421,11 @@ public partial class MainWindow : Window
                         " — " + Path.GetFileName(active.ProjectPath);
             }
             UpdateSidebar();
-            if (!silent) FooterStatus.Text = items.Length + " conversazioni nello storico del progetto.";
+            if (!silent) FooterStatus.Text = UiText.T("historyCount", items.Length);
         }
         catch (Exception ex)
         {
-            if (!silent) ShowError("Errore storico: " + ex.Message);
+            if (!silent) ShowError(UiText.T("historyReadError", ex.Message));
         }
     }
 
@@ -831,7 +831,7 @@ public partial class MainWindow : Window
     {
         using var dlg = new System.Windows.Forms.FolderBrowserDialog
         {
-            Description = "Seleziona il progetto Claude",
+            Description = UiText.T("openProject"),
             ShowNewFolderButton = false
         };
         if (_project is not null) dlg.SelectedPath = _project;
@@ -865,7 +865,12 @@ public partial class MainWindow : Window
     private async void ResumeHistory_Click(object sender, RoutedEventArgs e)
     {
         if (ConversationsList.SelectedItem is SidebarRow { History: { } selected })
-            await StartSessionAsync(selected);
+        {
+            if (InBin(selected))
+                FooterStatus.Text = UiText.T("restoreFirst");
+            else
+                await StartSessionAsync(selected);
+        }
         else if (ConversationsList.SelectedItem is SidebarRow { Live: { } active })
         {
             if (active.Status == "Terminata")
@@ -873,7 +878,7 @@ public partial class MainWindow : Window
                 var old = _history.FirstOrDefault(x => x.Provider == active.Provider &&
                     x.Id.Equals(active.ClaudeSessionId, StringComparison.OrdinalIgnoreCase));
                 if (old is null)
-                    ShowError("Nessun transcript disponibile: la chat potrebbe non avere ancora messaggi.");
+                    ShowError(UiText.T("noTranscript"));
                 else
                     await StartSessionAsync(old);
             }
@@ -883,11 +888,23 @@ public partial class MainWindow : Window
     private async void ConversationsList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (ConversationsList.SelectedItem is SidebarRow { History: { } selected })
-            await StartSessionAsync(selected);
+        {
+            if (InBin(selected))
+                FooterStatus.Text = UiText.T("restoreFirst");
+            else
+                await StartSessionAsync(selected);
+        }
     }
     private void ConversationsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_updatingSidebar) return;
+        if (ConversationsList.SelectedItem is SidebarRow { IsHeader: true } section)
+        {
+            if (!_collapsedFolders.Add(section.Key))
+                _collapsedFolders.Remove(section.Key);
+            UpdateSidebar();
+            return;
+        }
         if (ConversationsList.SelectedItem is SidebarRow { Live: { } active })
         {
             ShowActiveTerminal(active);
@@ -900,8 +917,8 @@ public partial class MainWindow : Window
         if (item.Status != "Terminata")
         {
             var response = System.Windows.MessageBox.Show(this,
-                "Terminare questa conversazione e il suo processo " + item.Provider + "? Il lavoro in corso verrà interrotto.",
-                "Chiudi sessione", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                UiText.T("closeSessionPrompt", item.Provider),
+                UiText.T("closeSessionTitle"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (response != MessageBoxResult.Yes) return;
         }
         _sessions.Remove(item.Id);
@@ -913,7 +930,7 @@ public partial class MainWindow : Window
         if (_live.Count == 0)
         {
             _visibleTerminalId = null;
-            ActiveTitle.Text = "Nessuna conversazione";
+            ActiveTitle.Text = UiText.T("noConversation");
         }
     }
 
@@ -922,8 +939,8 @@ public partial class MainWindow : Window
         if (!_closing && _live.Any(x => x.Status is "In esecuzione" or "Avvio" or "Errore I/O"))
         {
             var response = System.Windows.MessageBox.Show(this,
-                "Chiudere il terminale terminerà tutte le sessioni " + TerminalBrand.Provider + " in esecuzione. Vuoi continuare?",
-                "Sessioni ancora attive", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                UiText.T("closeAppPrompt", TerminalBrand.Provider),
+                UiText.T("sessionsActive"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (response != MessageBoxResult.Yes) { e.Cancel = true; return; }
         }
         _closing = true;
