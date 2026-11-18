@@ -634,6 +634,7 @@ public partial class MainWindow : Window
         try
         {
             LanguagePicker.SelectedIndex = UiText.IsItalian ? 1 : 0;
+            SubtitleLabel.Text = UiText.T("subtitle");
             ProjectLabel.Text = UiText.T("project");
             BrowseButton.Content = UiText.T("browse");
             OpenProjectButton.Content = UiText.T("openProject");
