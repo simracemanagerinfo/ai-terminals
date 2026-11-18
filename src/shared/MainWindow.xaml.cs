@@ -325,6 +325,8 @@ public partial class MainWindow : Window
             command += " -NewSessionId " + QuoteWindowsArgument(claudeId!);
         if (completionSignalPath is not null)
             command += " -CompletionSignalPath " + QuoteWindowsArgument(completionSignalPath);
+        if (!diagnosticShell)
+            command += " -UiLanguage " + QuoteWindowsArgument(UiText.Language);
         var pty = new ConPtySession("pwsh.exe", command, _project);
         var label = diagnosticShell
             ? UiText.T("diagnosticShell", DateTime.Now.ToString("HH:mm:ss"))
