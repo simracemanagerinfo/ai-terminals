@@ -95,6 +95,8 @@ public sealed class SessionOrganization
 
     public string FolderOf(string project, string sessionId)
     {
+        if (!Guid.TryParse(sessionId, out var parsedId)) return Unfiled;
+        sessionId = parsedId.ToString("D");
         var data = Find(project);
         return data is not null && data.Placements.TryGetValue(sessionId, out var placement)
             ? placement.FolderId : Unfiled;
@@ -141,8 +143,9 @@ public sealed class SessionOrganization
 
     public void Move(string project, string sessionId, string destination)
     {
-        if (!Guid.TryParse(sessionId, out _))
+        if (!Guid.TryParse(sessionId, out var parsedId))
             throw new ArgumentException("Invalid session ID.", nameof(sessionId));
+        sessionId = parsedId.ToString("D");
         var data = Ensure(project);
         if (destination != Unfiled && destination != Bin &&
             !data.Folders.Any(x => x.Id == destination))
@@ -160,6 +163,8 @@ public sealed class SessionOrganization
 
     public void Restore(string project, string sessionId)
     {
+        if (!Guid.TryParse(sessionId, out var parsedId)) return;
+        sessionId = parsedId.ToString("D");
         var data = Find(project);
         if (data is null || !data.Placements.TryGetValue(sessionId, out var placement) ||
             placement.FolderId != Bin) return;
