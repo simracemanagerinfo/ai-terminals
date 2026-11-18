@@ -722,7 +722,9 @@ public partial class MainWindow : Window
         catch (ArgumentException ex)
         {
             ShowError(ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase)
-                ? UiText.T("folderDuplicate") : UiText.T("folderInvalid"));
+                ? UiText.T("folderDuplicate") :
+                ex.Message.Contains("reserved", StringComparison.OrdinalIgnoreCase)
+                    ? UiText.T("folderReserved") : UiText.T("folderInvalid"));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
