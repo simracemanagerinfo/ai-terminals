@@ -2,7 +2,8 @@
 param(
     [Parameter(Mandatory)][string]$ProjectPath,
     [string]$SessionId,
-    [string]$NewSessionId
+    [string]$NewSessionId,
+    [string]$CompletionSignalPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -30,16 +31,37 @@ try {
 
     $Host.UI.RawUI.WindowTitle = "Claude Terminal :: $($directory.Name)"
     Write-Host "[Claude Terminal] Progetto: $($directory.FullName)" -ForegroundColor DarkYellow
+    $options = @()
+    if (-not [string]::IsNullOrWhiteSpace($CompletionSignalPath)) {
+        $notifyScript = Join-Path $PSScriptRoot 'Notify-ClaudeTurn.ps1'
+        if (-not (Test-Path -LiteralPath $notifyScript -PathType Leaf)) {
+            throw "Hook Claude mancante: $notifyScript"
+        }
+        # Session-scoped --settings: do not write ~/.claude/settings.json.
+        # Stop-hook input is received via stdin and never persisted.
+        $cmd = 'pwsh.exe -NoLogo -NoProfile -NonInteractive -File "' +
+            $notifyScript + '" -SignalPath "' +
+            [IO.Path]::GetFullPath($CompletionSignalPath) + '"'
+        $settings = @{
+            hooks = @{ Stop = @(@{ hooks = @(@{
+                type = 'command'
+                command = $cmd
+                timeout = 5
+            }) }) }
+        } | ConvertTo-Json -Depth 8 -Compress
+        $options = @('--settings', $settings)
+    }
+
     if ($SessionId) {
         Write-Host "[Claude Terminal] Riprendo sessione $SessionId" -ForegroundColor DarkYellow
-        & $claude.Source --resume $SessionId
+        & $claude.Source @options --resume $SessionId
     }
     elseif ($NewSessionId) {
         Write-Host "[Claude Terminal] Nuova sessione $NewSessionId" -ForegroundColor DarkYellow
-        & $claude.Source --session-id $NewSessionId
+        & $claude.Source @options --session-id $NewSessionId
     }
     else {
-        & $claude.Source
+        & $claude.Source @options
     }
 
     $claudeExitCode = $LASTEXITCODE
