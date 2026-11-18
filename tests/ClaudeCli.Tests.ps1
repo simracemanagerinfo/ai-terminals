@@ -44,7 +44,7 @@ try {
     if (Test-Path -LiteralPath $env:CLAUDE_TERMINAL_TEST_LOG) {
         throw 'Conflicting IDs reached Claude CLI'
     }
-    # The Claude Stop hook must be scoped to the launched session.
+    # Per-process Stop hook is passed only to this Claude CLI invocation.
     $signal = Join-Path $temp 'claude-completions.signals'
     $hook = Join-Path $PSScriptRoot '..\src\claude\Notify-ClaudeTurn.ps1'
     Remove-Item -LiteralPath $env:CLAUDE_TERMINAL_TEST_LOG -Force -ErrorAction SilentlyContinue
@@ -64,23 +64,13 @@ try {
         throw "Claude resume lost Stop hook or session ID: $captured"
     }
 
-    # No reply data should be copied to disk. Other events are ignored.
+    # The marker file must never receive private reply text.
     '{"hook_event_name":"Stop","session_id":"example","last_assistant_message":"secret"}' |
         & pwsh.exe -NoLogo -NoProfile -File $hook -SignalPath $signal
     '{"hook_event_name":"SubagentStop","session_id":"example"}' |
         & pwsh.exe -NoLogo -NoProfile -File $hook -SignalPath $signal
     $lines = @(Get-Content -LiteralPath $signal)
-    if ($lines.Count -ne 1 -or $lines[0] -notmatch '^[0-9a-f]{32}
-    # Actions interpretera come fallimento anche se tutte le asserzioni sono OK.
-    $global:LASTEXITCODE = 0
-    Write-Host '[PASS] Claude CLI launch/resume plus private Stop hook and completion markers.' -ForegroundColor Green
-}
-finally {
-    $env:PATH = $originalPath
-    $env:CLAUDE_TERMINAL_TEST_LOG = $originalLog
-    Remove-Item -LiteralPath $temp -Force -Recurse -ErrorAction SilentlyContinue
-}
- -or
+    if ($lines.Count -ne 1 -or $lines[0] -notmatch '^[0-9a-f]{32}$' -or
         (Get-Content -LiteralPath $signal -Raw).Contains('secret')) {
         throw 'Claude Stop hook did not record a private completion marker'
     }
@@ -88,7 +78,7 @@ finally {
     # Il caso negativo lascia LASTEXITCODE=1 nel processo di test, che GitHub
     # Actions interpretera come fallimento anche se tutte le asserzioni sono OK.
     $global:LASTEXITCODE = 0
-    Write-Host '[PASS] Claude --session-id, --resume, manual launch and conflict prevention.' -ForegroundColor Green
+    Write-Host '[PASS] Claude session launch/resume, private Stop hook and completion markers.' -ForegroundColor Green
 }
 finally {
     $env:PATH = $originalPath
