@@ -460,8 +460,10 @@ public partial class MainWindow : Window
                         !_sessions.TryGetValue(_notificationSessionId, out var target)) return;
                     if (WindowState == System.Windows.WindowState.Minimized)
                         WindowState = System.Windows.WindowState.Normal;
-                    Activate();
+                    // Select the intended chat before activating the window,
+                    // so Activated does not clear an unrelated unread chat.
                     UpdateSidebar(preferredTerminalId: target.Id);
+                    Activate();
                     MarkRead(target);
                 });
             }
