@@ -45,7 +45,8 @@ jobs:
           $paths = @(
             'scripts/Install-AITerminals.ps1',
             'src/claude/Start-ClaudeSession.ps1',
-            'src/codex/Start-CodexSession.ps1'
+            'src/codex/Start-CodexSession.ps1',
+            'src/codex/Notify-CodexTurn.ps1'
           )
           foreach ($path in $paths) {
             $tokens = $null
@@ -99,6 +100,7 @@ jobs:
             'out/CodexTerminal/CodexTerminal.exe',
             'out/CodexTerminal/wwwroot/index.html',
             'out/CodexTerminal/scripts/Start-CodexSession.ps1',
+            'out/CodexTerminal/scripts/Notify-CodexTurn.ps1',
             'out/CodexTerminal/assets/codex-terminal.png'
           )
           foreach ($entry in $checks) {
