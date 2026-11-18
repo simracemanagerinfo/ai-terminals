@@ -25,10 +25,17 @@
       <Setter Property="Margin" Value="0,2,0,3"/>
       <Setter Property="Background" Value="#29211D"/>
       <Setter Property="Foreground" Value="#F9E8D8"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
       <Style.Triggers>
         <Trigger Property="IsSelected" Value="True">
           <Setter Property="Background" Value="#684131"/>
         </Trigger>
+        <DataTrigger Binding="{Binding IsUnread}" Value="True">
+          <Setter Property="Background" Value="#5A3526"/>
+          <Setter Property="BorderBrush" Value="#E69A70"/>
+          <Setter Property="BorderThickness" Value="2"/>
+        </DataTrigger>
       </Style.Triggers>
     </Style>
   </Window.Resources>
