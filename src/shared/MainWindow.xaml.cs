@@ -957,7 +957,9 @@ public partial class MainWindow : Window
     }
 
     public sealed record SidebarRow(
-        string Key, string Title, string Detail, LiveItem? Live, HistoryEntry? History, bool IsUnread = false);
+        string Key, string Title, string Detail, LiveItem? Live, HistoryEntry? History,
+        bool IsUnread = false, bool IsHeader = false, string? FolderId = null,
+        Thickness Indent = default);
 
     public sealed class LiveItem : INotifyPropertyChanged
     {
