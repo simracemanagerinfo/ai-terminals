@@ -55,7 +55,7 @@ public sealed class CompletionToastWindow : Window
         var content = new StackPanel();
         content.Children.Add(new TextBlock
         {
-            Text = provider + " · Risposta completata",
+            Text = provider + " · " + UiText.T("toastComplete"),
             FontWeight = FontWeights.Bold,
             FontSize = 13,
             Foreground = new SolidColorBrush(accent)
@@ -72,7 +72,7 @@ public sealed class CompletionToastWindow : Window
         });
         content.Children.Add(new TextBlock
         {
-            Text = "Clicca per aprire la conversazione",
+            Text = UiText.T("toastOpen"),
             FontSize = 10,
             Foreground = new SolidColorBrush(Color.FromRgb(162, 187, 196)),
             Margin = new Thickness(0, 5, 0, 0)
