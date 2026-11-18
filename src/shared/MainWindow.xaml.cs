@@ -9,7 +9,6 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
-using WinForms = System.Windows.Forms;
 
 namespace ClaudeTerminal.Host;
 
@@ -24,8 +23,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _flushTimer = new() { Interval = TimeSpan.FromMilliseconds(30) };
     private readonly DispatcherTimer _titleRefreshTimer = new() { Interval = TimeSpan.FromSeconds(15) };
     private readonly DispatcherTimer _completionTimer = new() { Interval = TimeSpan.FromSeconds(1) };
-    private WinForms.NotifyIcon? _notificationIcon;
-    private string? _notificationSessionId;
+    private CompletionToastWindow? _completionToast;
     private bool _pollingHistory;
     private IReadOnlyList<HistoryEntry> _history = [];
     private string? _project;
@@ -80,9 +78,9 @@ public partial class MainWindow : Window
             finally { _pollingHistory = false; }
         };
         _titleRefreshTimer.Start();
-        if (TerminalBrand.Provider == "Codex")
+        // Both agents use native completion hooks with a private signal file.
         {
-            _completionTimer.Tick += (_, _) => PollCodexCompletions();
+            _completionTimer.Tick += (_, _) => PollCompletions();
             _completionTimer.Start();
             // Returning to the currently visible chat counts as reading it.
             Activated += (_, _) =>
@@ -303,9 +301,8 @@ public partial class MainWindow : Window
         var claudeId = diagnosticShell ? null : existing?.Id ??
             (provider == "Claude" ? Guid.NewGuid().ToString("D") : null);
         var id = Guid.NewGuid().ToString("N");
-        var completionSignalPath = !diagnosticShell && provider == "Codex"
-            ? Path.Combine(Path.GetTempPath(), "aiterminals-codex-" + id + ".signals")
-            : null;
+        var completionSignalPath = diagnosticShell ? null :
+            Path.Combine(Path.GetTempPath(), "aiterminals-" + provider.ToLowerInvariant() + "-" + id + ".signals");
         var command = diagnosticShell
             ? "-NoLogo -NoProfile"
             : "-NoLogo -NoProfile -File " + QuoteWindowsArgument(script) +
@@ -420,7 +417,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void PollCodexCompletions()
+    private void PollCompletions()
     {
         if (_closing) return;
         var changed = false;
@@ -435,50 +432,39 @@ public partial class MainWindow : Window
             session.Unread = true;
             changed = true;
             if (!IsActive || WindowState == System.Windows.WindowState.Minimized)
-                ShowCompletionNotification(session);
+                ShowCompletionToast(session);
         }
         if (changed) UpdateSidebar();
     }
 
-    private void ShowCompletionNotification(LiveItem session)
+    private void ShowCompletionToast(LiveItem session)
     {
         try
         {
-            if (_notificationIcon is null)
+            // A single unobtrusive toast per window. Multiple completed chats
+            // remain independently highlighted in the sidebar until read.
+            _completionToast?.Close();
+            var toast = new CompletionToastWindow(this, session.Provider, session.Label, () =>
             {
-                var icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath ?? "")
-                    ?? System.Drawing.SystemIcons.Information;
-                _notificationIcon = new WinForms.NotifyIcon
-                {
-                    Icon = icon,
-                    Text = "Codex Terminal",
-                    Visible = true
-                };
-                _notificationIcon.BalloonTipClicked += (_, _) => Dispatcher.BeginInvoke(() =>
-                {
-                    if (_notificationSessionId is null ||
-                        !_sessions.TryGetValue(_notificationSessionId, out var target)) return;
-                    if (WindowState == System.Windows.WindowState.Minimized)
-                        WindowState = System.Windows.WindowState.Normal;
-                    // Select the intended chat before activating the window,
-                    // so Activated does not clear an unrelated unread chat.
-                    UpdateSidebar(preferredTerminalId: target.Id);
-                    Activate();
-                    MarkRead(target);
-                });
-            }
-
-            _notificationSessionId = session.Id;
-            _notificationIcon.BalloonTipTitle = "Codex · Risposta completata";
-            _notificationIcon.BalloonTipText = session.Label.Length <= 200
-                ? session.Label : session.Label[..197] + "...";
-            _notificationIcon.BalloonTipIcon = WinForms.ToolTipIcon.Info;
-            _notificationIcon.ShowBalloonTip(5000);
+                if (_closing || !_sessions.TryGetValue(session.Id, out var target)) return;
+                if (WindowState == System.Windows.WindowState.Minimized)
+                    WindowState = System.Windows.WindowState.Normal;
+                UpdateSidebar(preferredTerminalId: target.Id);
+                Activate();
+                MarkRead(target);
+            });
+            _completionToast = toast;
+            toast.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(_completionToast, toast))
+                    _completionToast = null;
+            };
+            toast.ShowForCompletion();
         }
         catch (Exception)
         {
-            // Windows notifications are best-effort (Focus Assist may suppress
-            // them). The persistent unread highlight is still available.
+            // The unread marker remains visible if desktop policy or an
+            // exclusive full-screen application prevents showing a toast.
         }
     }
 
@@ -671,7 +657,7 @@ public partial class MainWindow : Window
         _flushTimer.Stop();
         _titleRefreshTimer.Stop();
         _completionTimer.Stop();
-        _notificationIcon?.Dispose();
+        _completionToast?.Close();
         foreach (var item in _live)
         {
             item.Terminal.Dispose();
