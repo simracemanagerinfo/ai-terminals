@@ -64,15 +64,14 @@ l'operazione senza cancellare nulla.
 - GitHub Actions verificano le combinazioni nel renderer e compilano entrambi gli EXE. Il test basso livello `ReadConsoleInputW` non è eseguibile in modo affidabile sul runner senza desktop: il comportamento nella TUI Codex va confermato sul PC Windows.
 - Aggiornamento in-place senza cartelle residue.
 
-## Anteprima: avviso risposta completata (Codex)
+## Anteprima: avviso risposta completata (Claude e Codex)
 
-- Quando Codex termina un turno con l'evento nativo `agent-turn-complete`, il terminale contrassegna la conversazione con un indicatore e un bordo colorato.
-- Se Codex Terminal non è in primo piano o è minimizzato, Windows riceve una notifica tramite l'area di notifica (`NotifyIcon`). La notifica non attiva la finestra; cliccandola si può tornare alla conversazione.
-- Se la finestra è in primo piano, non ci sono popup: resta solo l'evidenziazione della chat.
-- L'indicatore resta visibile finché selezioni o usi quella conversazione. Le altre chat non vengono azzerate.
-- Si usano segnali temporanei separati per ogni sessione, senza leggere il testo delle risposte o creare notifiche per vecchie conversazioni.
-- La CLI Codex viene avviata con un parametro `-c notify=[...]` **solo per il processo lanciato dal terminale**. Non viene modificato `~/.codex/config.toml`; tuttavia, un eventuale `notify` già configurato dall'utente viene **sostituito per quella specifica sessione**. Valutare questo vincolo prima di integrare il ramo nella release stabile.
-- Le notifiche dipendono dalle impostazioni di Windows, compresa la modalità Non disturbare.
+- Entrambi i terminali distinguono il completamento della risposta dai normali pause/ritardi: Codex usa il suo evento `agent-turn-complete`, Claude usa l'hook nativo `Stop`.
+- A finestra attiva **nessun popup**, ma evidenziazione della chat completata (arancione Claude, teal Codex). Il segnale sparisce quando apri o usi quella chat; non cancella gli indicatori delle altre.
+- Se la finestra è in secondo piano o ridotta a icona compare un **popup WPF compatto, non modale e non attivante** nell'angolo basso destro dello schermo su cui si trova il terminale. Il popup dura circa 7 secondi; cliccandolo apre la conversazione.
+- Il popup è interno all'applicazione, non una notifica registrata nel Centro notifiche di Windows. Sostituisce i vecchi balloon `NotifyIcon` che in alcune configurazioni non apparivano. Applicazioni in full-screen esclusivo possono comunque coprirlo.
+- File di segnale temporanei separati per sessione, solo ID della notifica e mai prompt, risposte o token; cancellati alla chiusura.
+- **Claude:** passa `--settings` alla sola istanza CLI avviata per aggiungere lo Stop hook; **Codex:** usa `-c notify=[...]` sulla sola istanza. Non vengono modificati i file `~/.claude/settings.json` o `~/.codex/config.toml`. Eventuali configurazioni personali per gli stessi hook possono essere sovrascritte solo per la sessione del terminale: verificare prima del merge.
 
 ## Privacy
 
