@@ -10,6 +10,8 @@
     <Compile Include="../../src/shared/SessionHistory.cs" Link="SessionHistory.cs"/>
     <Compile Include="../../src/shared/CodexHistory.cs" Link="CodexHistory.cs"/>
     <Compile Include="../../src/shared/CodexCompletionSignals.cs" Link="CodexCompletionSignals.cs"/>
+    <Compile Include="../../src/shared/SessionOrganization.cs" Link="SessionOrganization.cs"/>
+    <Compile Include="../../src/shared/UiText.cs" Link="UiText.cs"/>
     <Compile Include="../../src/claude/TerminalBrand.cs" Link="TerminalBrand.cs" />
   </ItemGroup>
 </Project>
