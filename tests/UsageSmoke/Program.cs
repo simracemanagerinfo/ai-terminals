@@ -164,6 +164,51 @@ try
         CodexCompletionSignals.ReadNewTurnIds(signalsPath, ref readCount, seen).Count != 0)
         throw new Exception("Incremental turn completions were lost or replayed");
 
+    // Virtual folders and Bin must survive reopening without touching either
+    // agent's transcript, index or CLI configuration.
+    var organizationPath = Path.Combine(home, "ui-folders.json");
+    var folders = SessionOrganization.Open(organizationPath);
+    var architecture = folders.Create(project, "Architecture");
+    var development = folders.Create(project, "Development");
+    folders.Move(project, customId, architecture.Id);
+    folders.Move(project, codexId, development.Id);
+    folders.Move(project, customId, SessionOrganization.Bin);
+    if (folders.FolderOf(project, customId) != SessionOrganization.Bin)
+        throw new Exception("Bin placement not saved.");
+    var reopenedFolders = SessionOrganization.Open(organizationPath);
+    if (reopenedFolders.FolderOf(project, customId) != SessionOrganization.Bin ||
+        reopenedFolders.Folders(project).Count != 2)
+        throw new Exception("Bin or folder persistence failed.");
+    reopenedFolders.Restore(project, customId);
+    if (reopenedFolders.FolderOf(project, customId) != architecture.Id)
+        throw new Exception("Restore did not return to the previous folder.");
+    reopenedFolders.Move(project, customId, SessionOrganization.Bin);
+    reopenedFolders.RemoveFolder(project, architecture.Id);
+    reopenedFolders.Restore(project, customId);
+    if (reopenedFolders.FolderOf(project, customId) != SessionOrganization.Unfiled)
+        throw new Exception("Removing a folder did not preserve a safe restore fallback.");
+    var secondProject = Path.Combine(home, "Other Project");
+    Directory.CreateDirectory(secondProject);
+    if (reopenedFolders.Folders(secondProject).Count != 0 ||
+        reopenedFolders.FolderOf(secondProject, codexId) != SessionOrganization.Unfiled)
+        throw new Exception("Project organization leaked into a different project.");
+    if (!File.Exists(ClaudePath(customId)) || !File.Exists(codexPath) ||
+        !File.Exists(indexPath) || !File.Exists(Path.Combine(claudeFolder, "sessions-index.json")))
+        throw new Exception("A virtual folder modified a provider transcript or index.");
+    File.WriteAllText(organizationPath, "{broken-data");
+    try
+    {
+        SessionOrganization.Open(organizationPath);
+        throw new Exception("Corrupt organization metadata was silently overwritten.");
+    }
+    catch (InvalidDataException) { }
+    if (File.ReadAllText(organizationPath) != "{broken-data")
+        throw new Exception("Corrupted organization data was changed.");
+    if (UiText.T("bin") is not ("Bin" or "Secchio") ||
+        UiText.T("moveToBin") is not ("Move to Bin" or "Sposta nel Secchio") ||
+        UiText.T("unknown-code") != "unknown-code")
+        throw new Exception("UI language fallback or Bin translation is invalid.");
+
     Console.WriteLine("[PASS] Claude response dedupe; Codex token snapshots/reset; Claude stored titles, explicit Codex titles and response_item fallback");
 
 }
