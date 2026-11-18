@@ -9,6 +9,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
+using WinForms = System.Windows.Forms;
 
 namespace ClaudeTerminal.Host;
 
@@ -22,6 +23,9 @@ public partial class MainWindow : Window
     private readonly ConcurrentQueue<(string Id, string Text)> _output = new();
     private readonly DispatcherTimer _flushTimer = new() { Interval = TimeSpan.FromMilliseconds(30) };
     private readonly DispatcherTimer _titleRefreshTimer = new() { Interval = TimeSpan.FromSeconds(15) };
+    private readonly DispatcherTimer _completionTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private WinForms.NotifyIcon? _notificationIcon;
+    private string? _notificationSessionId;
     private bool _pollingHistory;
     private IReadOnlyList<HistoryEntry> _history = [];
     private string? _project;
@@ -76,6 +80,23 @@ public partial class MainWindow : Window
             finally { _pollingHistory = false; }
         };
         _titleRefreshTimer.Start();
+        if (TerminalBrand.Provider == "Codex")
+        {
+            _completionTimer.Tick += (_, _) => PollCodexCompletions();
+            _completionTimer.Start();
+            // Returning to the currently visible chat counts as reading it.
+            Activated += (_, _) =>
+            {
+                if (_visibleTerminalId is not null &&
+                    _sessions.TryGetValue(_visibleTerminalId, out var selected))
+                    MarkRead(selected);
+            };
+            ConversationsList.PreviewMouseLeftButtonUp += (_, _) =>
+            {
+                if (ConversationsList.SelectedItem is SidebarRow { Live: { } selected })
+                    MarkRead(selected);
+            };
+        }
         Loaded += async (_, _) =>
         {
             try
@@ -146,7 +167,11 @@ public partial class MainWindow : Window
                     if (id is not null && _sessions.TryGetValue(id, out var active) &&
                         active.Status is "Avvio" or "In esecuzione" &&
                         msg.TryGetProperty("data", out var dataValue) && dataValue.ValueKind == JsonValueKind.String)
+                    {
+                        if (IsActive && _visibleTerminalId == id)
+                            MarkRead(active);
                         await active.Terminal.WriteAsync(dataValue.GetString() ?? "");
+                    }
                     break;
                 case "copy":
                     if (id is not null && _sessions.ContainsKey(id) &&
@@ -277,6 +302,10 @@ public partial class MainWindow : Window
         // Never invent a Codex identity that the CLI has not actually accepted.
         var claudeId = diagnosticShell ? null : existing?.Id ??
             (provider == "Claude" ? Guid.NewGuid().ToString("D") : null);
+        var id = Guid.NewGuid().ToString("N");
+        var completionSignalPath = !diagnosticShell && provider == "Codex"
+            ? Path.Combine(Path.GetTempPath(), "aiterminals-codex-" + id + ".signals")
+            : null;
         var command = diagnosticShell
             ? "-NoLogo -NoProfile"
             : "-NoLogo -NoProfile -File " + QuoteWindowsArgument(script) +
@@ -285,12 +314,13 @@ public partial class MainWindow : Window
             command += " -SessionId " + QuoteWindowsArgument(existing.Id);
         else if (!diagnosticShell && provider == "Claude")
             command += " -NewSessionId " + QuoteWindowsArgument(claudeId!);
+        if (completionSignalPath is not null)
+            command += " -CompletionSignalPath " + QuoteWindowsArgument(completionSignalPath);
         var pty = new ConPtySession("pwsh.exe", command, _project);
-        var id = Guid.NewGuid().ToString("N");
         var label = diagnosticShell
             ? ("Shell diagnostica " + DateTime.Now.ToString("HH:mm:ss"))
             : existing?.Title ?? ("Nuova chat " + DateTime.Now.ToString("HH:mm:ss"));
-        var item = new LiveItem(id, label, claudeId, _project, pty, provider);
+        var item = new LiveItem(id, label, claudeId, _project, pty, provider, completionSignalPath);
         _sessions.Add(id, item);
         _live.Add(item);
         Send(new { type = "create", id, label,
@@ -390,6 +420,84 @@ public partial class MainWindow : Window
         }
     }
 
+    private void PollCodexCompletions()
+    {
+        if (_closing) return;
+        var changed = false;
+        foreach (var session in _live.ToArray())
+        {
+            var read = session.NotificationsRead;
+            var turns = CodexCompletionSignals.ReadNewTurnIds(
+                session.CompletionSignalPath, ref read, session.SeenNotifications);
+            session.NotificationsRead = read;
+            if (turns.Count == 0) continue;
+
+            session.Unread = true;
+            changed = true;
+            if (!IsActive || WindowState == System.Windows.WindowState.Minimized)
+                ShowCompletionNotification(session);
+        }
+        if (changed) UpdateSidebar();
+    }
+
+    private void ShowCompletionNotification(LiveItem session)
+    {
+        try
+        {
+            if (_notificationIcon is null)
+            {
+                var icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath ?? "")
+                    ?? System.Drawing.SystemIcons.Information;
+                _notificationIcon = new WinForms.NotifyIcon
+                {
+                    Icon = icon,
+                    Text = "Codex Terminal",
+                    Visible = true
+                };
+                _notificationIcon.BalloonTipClicked += (_, _) => Dispatcher.BeginInvoke(() =>
+                {
+                    if (_notificationSessionId is null ||
+                        !_sessions.TryGetValue(_notificationSessionId, out var target)) return;
+                    if (WindowState == System.Windows.WindowState.Minimized)
+                        WindowState = System.Windows.WindowState.Normal;
+                    Activate();
+                    UpdateSidebar(preferredTerminalId: target.Id);
+                    MarkRead(target);
+                });
+            }
+
+            _notificationSessionId = session.Id;
+            _notificationIcon.BalloonTipTitle = "Codex · Risposta completata";
+            _notificationIcon.BalloonTipText = session.Label.Length <= 200
+                ? session.Label : session.Label[..197] + "...";
+            _notificationIcon.BalloonTipIcon = WinForms.ToolTipIcon.Info;
+            _notificationIcon.ShowBalloonTip(5000);
+        }
+        catch (Exception)
+        {
+            // Windows notifications are best-effort (Focus Assist may suppress
+            // them). The persistent unread highlight is still available.
+        }
+    }
+
+    private void MarkRead(LiveItem session)
+    {
+        if (!session.Unread) return;
+        session.Unread = false;
+        UpdateSidebar();
+    }
+
+    private static void DeleteCompletionSignal(LiveItem session)
+    {
+        try
+        {
+            if (session.CompletionSignalPath is { } file && File.Exists(file))
+                File.Delete(file);
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
+
     private void UpdateSidebar(string? preferredTerminalId = null)
     {
         var previousKey = (ConversationsList.SelectedItem as SidebarRow)?.Key;
@@ -402,13 +510,14 @@ public partial class MainWindow : Window
         // Ogni processo ConPTY compare una volta sola, anche cambiando progetto.
         foreach (var active in _live)
         {
-            var title = active.Label;
-            var detail = active.Provider + " · " + active.Status + " · " + Path.GetFileName(active.ProjectPath);
+            var title = active.Unread ? "● " + active.Label : active.Label;
+            var detail = active.Provider + " · " + active.Status + " · " + Path.GetFileName(active.ProjectPath) +
+                (active.Unread ? " · Risposta pronta" : "");
             if (search.Length > 0 &&
                 !title.Contains(search, StringComparison.OrdinalIgnoreCase) &&
                 !detail.Contains(search, StringComparison.OrdinalIgnoreCase))
                 continue;
-            rows.Add(new SidebarRow("live:" + active.Id, title, detail, active, null));
+            rows.Add(new SidebarRow("live:" + active.Id, title, detail, active, null, active.Unread));
         }
 
         // Lo storico è limitato al progetto scelto. Evita doppioni delle chat riprese.
@@ -519,7 +628,10 @@ public partial class MainWindow : Window
     {
         if (_updatingSidebar) return;
         if (ConversationsList.SelectedItem is SidebarRow { Live: { } active })
+        {
             ShowActiveTerminal(active);
+            MarkRead(active);
+        }
     }
     private void CloseSession_Click(object sender, RoutedEventArgs e)
     {
@@ -534,6 +646,7 @@ public partial class MainWindow : Window
         _sessions.Remove(item.Id);
         _live.Remove(item);
         item.Terminal.Dispose();
+        DeleteCompletionSignal(item);
         Send(new { type = "remove", id = item.Id });
         UpdateSidebar(preferredTerminalId: _live.LastOrDefault()?.Id);
         if (_live.Count == 0)
@@ -555,12 +668,18 @@ public partial class MainWindow : Window
         _closing = true;
         _flushTimer.Stop();
         _titleRefreshTimer.Stop();
-        foreach (var item in _live) item.Terminal.Dispose();
+        _completionTimer.Stop();
+        _notificationIcon?.Dispose();
+        foreach (var item in _live)
+        {
+            item.Terminal.Dispose();
+            DeleteCompletionSignal(item);
+        }
         _sessions.Clear();
     }
 
     public sealed record SidebarRow(
-        string Key, string Title, string Detail, LiveItem? Live, HistoryEntry? History);
+        string Key, string Title, string Detail, LiveItem? Live, HistoryEntry? History, bool IsUnread = false);
 
     public sealed class LiveItem : INotifyPropertyChanged
     {
@@ -578,6 +697,10 @@ public partial class MainWindow : Window
             }
         }
         public string? ClaudeSessionId { get; }
+        public string? CompletionSignalPath { get; }
+        public int NotificationsRead { get; set; }
+        public HashSet<string> SeenNotifications { get; } = new(StringComparer.Ordinal);
+        public bool Unread { get; set; }
         public string ProjectPath { get; }
         public string Provider { get; }
         public ConPtySession Terminal { get; }
@@ -592,8 +715,8 @@ public partial class MainWindow : Window
         }
         public event PropertyChangedEventHandler? PropertyChanged;
         public LiveItem(string id, string label, string? claudeId, string projectPath,
-            ConPtySession terminal, string provider)
-            => (Id, Label, ClaudeSessionId, ProjectPath, Terminal, Provider) =
-                (id, label, claudeId, projectPath, terminal, provider);
+            ConPtySession terminal, string provider, string? completionSignalPath)
+            => (Id, Label, ClaudeSessionId, ProjectPath, Terminal, Provider, CompletionSignalPath) =
+                (id, label, claudeId, projectPath, terminal, provider, completionSignalPath);
     }
 }
