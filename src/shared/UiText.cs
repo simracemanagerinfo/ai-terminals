@@ -35,6 +35,7 @@ public static class UiText
         ["folderDeletePrompt"] = ("Remove the folder '{0}'? Its conversations will return to Unorganized; no transcript will be deleted.", "Rimuovere la cartella '{0}'? Le conversazioni torneranno in Non organizzate; nessun transcript verrà cancellato."),
         ["folderDuplicate"] = ("A folder with this name already exists.", "Esiste già una cartella con questo nome."),
         ["folderInvalid"] = ("Enter a name between 1 and 60 characters, on one line.", "Inserisci un nome tra 1 e 60 caratteri, su una sola riga."),
+        ["folderReserved"] = ("This name is reserved for a built-in folder.", "Questo nome è riservato a una cartella predefinita."),
         ["folderSelect"] = ("Move to folder", "Sposta nella cartella"),
         ["unorganized"] = ("Unorganized", "Non organizzate"),
         ["liveConversations"] = ("Active conversations", "Conversazioni attive"),
