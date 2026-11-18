@@ -170,6 +170,12 @@ try
     var folders = SessionOrganization.Open(organizationPath);
     var architecture = folders.Create(project, "Architecture");
     var development = folders.Create(project, "Development");
+    try
+    {
+        folders.Create(project, "Secchio");
+        throw new Exception("Reserved Bin name was accepted as a user folder.");
+    }
+    catch (ArgumentException) { }
     folders.Move(project, customId, architecture.Id);
     folders.Move(project, codexId, development.Id);
     folders.Move(project, customId, SessionOrganization.Bin);
