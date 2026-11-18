@@ -18,6 +18,8 @@ public static class UiText
     private static readonly Dictionary<string, (string En, string It)> Strings = new(StringComparer.Ordinal)
     {
         ["project"] = ("Project", "Progetto"),
+        ["subtitle"] = ("CONPTY · MULTI-SESSION", "CONPTY · MULTISESSIONE"),
+        ["historyFallback"] = ("Conversation {0}", "Conversazione {0}"),
         ["browse"] = ("Browse...", "Sfoglia..."),
         ["openProject"] = ("Open project", "Apri progetto"),
         ["search"] = ("Search", "Cerca"),
