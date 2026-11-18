@@ -210,7 +210,8 @@ public static class SessionHistory
         try
         {
             using var doc = JsonDocument.Parse(File.ReadAllText(path));
-            if (!doc.RootElement.TryGetProperty("entries", out var entries) ||
+            if (doc.RootElement.ValueKind != JsonValueKind.Object ||
+                !doc.RootElement.TryGetProperty("entries", out var entries) ||
                 entries.ValueKind != JsonValueKind.Array) return titles;
             foreach (var entry in entries.EnumerateArray())
             {
