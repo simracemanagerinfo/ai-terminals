@@ -617,6 +617,208 @@ public partial class MainWindow : Window
         Send(new { type = "select", id = item.Id });
     }
 
+    private void ApplyLanguage()
+    {
+        _applyingLanguage = true;
+        try
+        {
+            LanguagePicker.SelectedIndex = UiText.IsItalian ? 1 : 0;
+            ProjectLabel.Text = UiText.T("project");
+            BrowseButton.Content = UiText.T("browse");
+            OpenProjectButton.Content = UiText.T("openProject");
+            SearchButton.Content = UiText.T("search");
+            SearchButton.ToolTip = UiText.T("searchHint");
+            RefreshButton.ToolTip = UiText.T("refreshHint");
+            ConversationHeader.Text = UiText.T("conversations");
+            NewSessionButton.Content = UiText.T("newConversation");
+            NewFolderButton.Content = UiText.T("newFolder");
+            NewFolderButton.ToolTip = UiText.T("newFolderHint");
+            LanguageLabel.Text = UiText.T("language") + ":";
+            ConversationFilter.ToolTip = UiText.T("filterHint");
+            TokenButton.Content = UiText.T("tokens");
+            TokenButton.ToolTip = UiText.T("tokensHint", TerminalBrand.Provider);
+            ResumeButton.Content = UiText.T("resume");
+            CloseSessionButton.Content = UiText.T("closeSession");
+            if (_visibleTerminalId is null)
+                ActiveTitle.Text = UiText.T("noConversation");
+            if (_project is null)
+                SideStatus.Text = UiText.T("sideChoose");
+            else
+                SideStatus.Text = UiText.T("sideProject", _project);
+            FooterStatus.Text = _webReady ? UiText.T("rendererReady") : UiText.T("loadingRenderer");
+            UpdateSidebar();
+        }
+        finally { _applyingLanguage = false; }
+    }
+
+    private void LanguagePicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_applyingLanguage || !IsLoaded ||
+            LanguagePicker.SelectedItem is not ComboBoxItem item) return;
+        var language = item.Tag?.ToString();
+        if (language is not ("en" or "it") || language == UiText.Language) return;
+        try
+        {
+            UiText.SetLanguage(language);
+            ApplyLanguage();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            ShowError(ex.Message);
+        }
+    }
+
+    private static string FolderLabel(SessionOrganization.FolderInfo folder)
+        => folder.Name;
+
+    private string? PromptFolderName(string heading, string initial = "")
+    {
+        var dialog = new Window
+        {
+            Owner = this, Title = heading, Width = 420, Height = 185,
+            ResizeMode = ResizeMode.NoResize,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ShowInTaskbar = false,
+            FontFamily = FontFamily,
+            Background = Background,
+            Foreground = Foreground
+        };
+        var content = new StackPanel { Margin = new Thickness(18) };
+        content.Children.Add(new TextBlock { Text = UiText.T("folderName") });
+        var entry = new TextBox
+        {
+            Text = initial, Margin = new Thickness(0, 9, 0, 13),
+            Padding = new Thickness(8)
+        };
+        content.Children.Add(entry);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        var save = new Button { Content = UiText.T("save"), MinWidth = 85, IsDefault = true };
+        var cancel = new Button { Content = UiText.T("cancel"), MinWidth = 85, IsCancel = true };
+        save.Click += (_, _) => dialog.DialogResult = true;
+        cancel.Click += (_, _) => dialog.DialogResult = false;
+        buttons.Children.Add(save);
+        buttons.Children.Add(cancel);
+        content.Children.Add(buttons);
+        dialog.Content = content;
+        dialog.Loaded += (_, _) => { entry.Focus(); entry.SelectAll(); };
+        return dialog.ShowDialog() == true ? entry.Text : null;
+    }
+
+    private void EditFolders(Action action)
+    {
+        try { action(); UpdateSidebar(); }
+        catch (ArgumentException ex)
+        {
+            ShowError(ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase)
+                ? UiText.T("folderDuplicate") : UiText.T("folderInvalid"));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            ShowError(UiText.T("organizationError", ex.Message));
+        }
+    }
+
+    private void NewFolder_Click(object sender, RoutedEventArgs e)
+    {
+        if (_project is null || _organization is null) return;
+        var name = PromptFolderName(UiText.T("folderCreate"));
+        if (name is null) return;
+        EditFolders(() => _organization.Create(_project, name));
+    }
+
+    private void RenameFolder(string id)
+    {
+        if (_project is null || _organization is null) return;
+        var folder = _organization.Folders(_project).FirstOrDefault(f => f.Id == id);
+        if (folder is null) return;
+        var name = PromptFolderName(UiText.T("folderRename"), folder.Name);
+        if (name is null) return;
+        EditFolders(() => _organization.Rename(_project, id, name));
+    }
+
+    private void RemoveFolder(string id)
+    {
+        if (_project is null || _organization is null) return;
+        var folder = _organization.Folders(_project).FirstOrDefault(f => f.Id == id);
+        if (folder is null) return;
+        if (MessageBox.Show(this, UiText.T("folderDeletePrompt", folder.Name),
+                UiText.T("folderDelete"), MessageBoxButton.YesNo, MessageBoxImage.Question)
+            != MessageBoxResult.Yes) return;
+        EditFolders(() => _organization.RemoveFolder(_project, id));
+    }
+
+    private void MoveHistory(HistoryEntry session, string target)
+    {
+        if (_project is null || _organization is null) return;
+        if (target == SessionOrganization.Bin &&
+            MessageBox.Show(this, UiText.T("binConfirm", session.Title),
+                UiText.T("bin"), MessageBoxButton.YesNo, MessageBoxImage.Question)
+            != MessageBoxResult.Yes) return;
+        EditFolders(() =>
+        {
+            if (target == "__restore__") _organization.Restore(_project, session.Id);
+            else _organization.Move(_project, session.Id, target);
+        });
+    }
+
+    private bool InBin(HistoryEntry session) =>
+        _project is not null && _organization?.FolderOf(_project, session.Id)
+            == SessionOrganization.Bin;
+
+    private void ConversationsList_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        var source = e.OriginalSource as DependencyObject;
+        var container = source is null ? null :
+            ItemsControl.ContainerFromElement(ConversationsList, source) as ListBoxItem;
+        if (container?.DataContext is not SidebarRow row || _organization is null ||
+            _project is null)
+        { e.Handled = true; return; }
+
+        var menu = new ContextMenu();
+        MenuItem Item(string title, Action action)
+        {
+            var item = new MenuItem { Header = title };
+            item.Click += (_, _) => action();
+            return item;
+        }
+
+        if (row.IsHeader && row.FolderId is { Length: > 0 } folderId &&
+            folderId != SessionOrganization.Bin)
+        {
+            menu.Items.Add(Item(UiText.T("folderRename"), () => RenameFolder(folderId)));
+            menu.Items.Add(Item(UiText.T("folderDelete"), () => RemoveFolder(folderId)));
+        }
+        else if (row.History is { } conversation)
+        {
+            if (InBin(conversation))
+                menu.Items.Add(Item(UiText.T("restore"),
+                    () => MoveHistory(conversation, "__restore__")));
+            else
+            {
+                var submenu = new MenuItem { Header = UiText.T("folderSelect") };
+                submenu.Items.Add(Item(UiText.T("unorganized"),
+                    () => MoveHistory(conversation, SessionOrganization.Unfiled)));
+                foreach (var folder in _organization.Folders(_project))
+                {
+                    var destination = folder.Id;
+                    submenu.Items.Add(Item(folder.Name,
+                        () => MoveHistory(conversation, destination)));
+                }
+                menu.Items.Add(submenu);
+                menu.Items.Add(new Separator());
+                menu.Items.Add(Item(UiText.T("moveToBin"),
+                    () => MoveHistory(conversation, SessionOrganization.Bin)));
+            }
+        }
+
+        if (menu.Items.Count == 0) { e.Handled = true; return; }
+        ConversationsList.ContextMenu = menu;
+    }
+
     private void ShowError(string message)
     {
         FooterStatus.Text = message;
