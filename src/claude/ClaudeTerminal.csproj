@@ -34,6 +34,10 @@
       <Link>scripts\Start-ClaudeSession.ps1</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Notify-ClaudeTurn.ps1">
+      <Link>scripts\Notify-ClaudeTurn.ps1</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="assets\claude-terminal.png">
       <Link>assets\claude-terminal.png</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
