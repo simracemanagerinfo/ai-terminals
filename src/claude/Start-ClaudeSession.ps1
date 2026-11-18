@@ -7,6 +7,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$settingsFile = $null
 try {
     if ($SessionId -and $NewSessionId) { throw 'Usare -SessionId oppure -NewSessionId, non entrambi.' }
     foreach ($id in @($SessionId, $NewSessionId)) {
@@ -48,8 +49,19 @@ try {
                 command = $cmd
                 timeout = 5
             }) }) }
-        } | ConvertTo-Json -Depth 8 -Compress
-        $options = @('--settings', $settings)
+        } | ConvertTo-Json -Depth 8
+        # Claude's Windows .cmd shim can strip quotes from inline JSON.
+        # --settings explicitly supports a file path; persist the temporary
+        # JSON only while this CLI process is running.
+        $settingsFile = Join-Path ([IO.Path]::GetTempPath()) (
+            'aiterminals-claude-settings-' + [Guid]::NewGuid().ToString('N') + '.json')
+        Set-Content -LiteralPath $settingsFile -Value $settings -Encoding utf8 -NoNewline
+        # Validate the exact bytes Claude will read, not only the in-memory JSON.
+        $validated = Get-Content -LiteralPath $settingsFile -Raw | ConvertFrom-Json -AsHashtable
+        if (-not $validated['hooks']['Stop'][0]['hooks'][0]['command']) {
+            throw 'Configurazione hook Claude non valida.'
+        }
+        $options = @('--settings', $settingsFile)
     }
 
     if ($SessionId) {
@@ -72,4 +84,9 @@ try {
 catch {
     Write-Host "[Claude Terminal] $($_.Exception.Message)" -ForegroundColor Red
     exit 1
+}
+finally {
+    if ($settingsFile -and (Test-Path -LiteralPath $settingsFile -PathType Leaf)) {
+        Remove-Item -LiteralPath $settingsFile -Force -ErrorAction SilentlyContinue
+    }
 }
