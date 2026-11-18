@@ -19,6 +19,11 @@ public partial class MainWindow : Window
     private bool _updatingSidebar;
     private string? _visibleTerminalId;
     private readonly Dictionary<string, LiveItem> _sessions = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _collapsedFolders = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _knownBinSections = new(StringComparer.OrdinalIgnoreCase);
+    private SessionOrganization? _organization;
+    private string? _organizationLoadError;
+    private bool _applyingLanguage;
     private readonly ConcurrentQueue<(string Id, string Text)> _output = new();
     private readonly DispatcherTimer _flushTimer = new() { Interval = TimeSpan.FromMilliseconds(30) };
     private readonly DispatcherTimer _titleRefreshTimer = new() { Interval = TimeSpan.FromSeconds(15) };
@@ -38,6 +43,11 @@ public partial class MainWindow : Window
         InitializeComponent();
         ConversationsList.ItemsSource = _sidebar;
         NewSessionButton.IsEnabled = false;
+        NewFolderButton.IsEnabled = false;
+        try { _organization = SessionOrganization.ForAgent(TerminalBrand.Provider); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        { _organizationLoadError = ex.Message; }
+        ApplyLanguage();
         PreviewKeyDown += (_, e) =>
         {
             if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control)
@@ -103,7 +113,9 @@ public partial class MainWindow : Window
                 if (Directory.Exists(ProjectCombo.Text))
                     await SetProjectAsync(ProjectCombo.Text);
             }
-            catch (Exception ex) { ShowError("Impossibile inizializzare il terminale: " + ex.Message); }
+            catch (Exception ex) { ShowError(UiText.T("initFailed", ex.Message)); }
+            if (_organizationLoadError is not null)
+                ShowError(UiText.T("invalidOrganization", _organizationLoadError));
         };
         Closing += MainWindow_Closing;
     }
