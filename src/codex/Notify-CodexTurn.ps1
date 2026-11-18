@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][string]$SignalPath,
-    [Parameter(Mandatory)][string]$EventJson
+    [Parameter(Mandatory, Position = 0)][string]$SignalPath,
+    [Parameter(Mandatory, Position = 1)][string]$EventJson
 )
 
 # Invoked by Codex CLI via its per-process "notify" hook.
