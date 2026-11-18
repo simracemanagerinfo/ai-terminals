@@ -13,17 +13,42 @@ public partial class UsageWindow : Window
     public UsageWindow(string? currentProject)
     {
         InitializeComponent();
+        ApplyLanguage();
         _currentProject = currentProject;
         if (currentProject is null || !Directory.Exists(currentProject))
             ScopeFilter.IsEnabled = false;
         Loaded += async (_, _) => await RefreshAsync();
     }
 
+    private void ApplyLanguage()
+    {
+        Title = UiText.T("usageTitle") + " — " + TerminalBrand.Provider;
+        UsageRefreshButton.Content = UiText.T("usageRefresh");
+        UsageCloseButton.Content = UiText.T("close");
+        UsageTitleLabel.Text = UiText.T("usageTitle");
+        UsageSubtitleLabel.Text = UiText.T("usageSubtitle",
+            TerminalBrand.Provider == "Claude" ? "Claude Code" : "Codex CLI");
+        AgentLabel.Text = UiText.T("agent");
+        ScopeLabel.Text = UiText.T("scope");
+        ((ComboBoxItem)ScopeFilter.Items[0]).Content = UiText.T("allProjects");
+        ((ComboBoxItem)ScopeFilter.Items[1]).Content = UiText.T("currentProject");
+        ScanStatus.Text = UiText.T("readLocal");
+        UsageInfoLabel.Text = UiText.T("usageInfo");
+        string[] keys =
+        [
+            "agent", "project", "session", "model", "inputHeader",
+            "cacheReadHeader", "cacheWriteHeader", "outputHeader",
+            "reasoningHeader", "total", "lastActivity"
+        ];
+        for (var i = 0; i < keys.Length && i < UsageGrid.Columns.Count; ++i)
+            UsageGrid.Columns[i].Header = UiText.T(keys[i]);
+    }
+
     private async Task RefreshAsync()
     {
         if (_busy) return;
         _busy = true;
-        ScanStatus.Text = "Analisi in corso...";
+        ScanStatus.Text = UiText.T("scanning");
         ErrorLabel.Text = "";
         try
         {
@@ -33,7 +58,7 @@ public partial class UsageWindow : Window
         }
         catch (Exception ex)
         {
-            ErrorLabel.Text = "Impossibile leggere i dati locali: " + ex.Message;
+            ErrorLabel.Text = UiText.T("readLocalFailed", ex.Message);
         }
         finally
         {
@@ -44,11 +69,9 @@ public partial class UsageWindow : Window
     private void ApplyFilters()
     {
         if (!IsLoaded) return;
-        var provider = (ProviderFilter.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Tutti";
-        var scope = (ScopeFilter.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Tutti i progetti";
+        var currentProjectOnly = ScopeFilter.SelectedIndex == 1;
         var filtered = _rows.Where(row =>
-            (provider == "Tutti" || row.Provider == provider) &&
-            (scope != "Progetto corrente" ||
+            (!currentProjectOnly ||
              (_currentProject is not null &&
               string.Equals(row.Project.TrimEnd(Path.DirectorySeparatorChar),
                             _currentProject.TrimEnd(Path.DirectorySeparatorChar),
@@ -56,13 +79,13 @@ public partial class UsageWindow : Window
 
         UsageGrid.ItemsSource = filtered;
         long total = filtered.Sum(x => x.Total);
-        TotalLabel.Text = "Token totali: " + total.ToString("N0");
-        InputLabel.Text = "Input: " + filtered.Sum(x => x.Input).ToString("N0");
-        CacheReadLabel.Text = "Cache letta: " + filtered.Sum(x => x.CacheRead).ToString("N0");
-        CacheWriteLabel.Text = "Cache scritta: " + filtered.Sum(x => x.CacheWrite).ToString("N0");
-        OutputLabel.Text = "Output: " + filtered.Sum(x => x.Output).ToString("N0");
-        ReasoningLabel.Text = "Ragionamento: " + filtered.Sum(x => x.Reasoning).ToString("N0");
-        ScanStatus.Text = filtered.Length + " sessioni / " + _rows.Count + " con dati disponibili";
+        TotalLabel.Text = UiText.T("totalTokens", total.ToString("N0"));
+        InputLabel.Text = UiText.T("input", filtered.Sum(x => x.Input).ToString("N0"));
+        CacheReadLabel.Text = UiText.T("cacheRead", filtered.Sum(x => x.CacheRead).ToString("N0"));
+        CacheWriteLabel.Text = UiText.T("cacheWrite", filtered.Sum(x => x.CacheWrite).ToString("N0"));
+        OutputLabel.Text = UiText.T("output", filtered.Sum(x => x.Output).ToString("N0"));
+        ReasoningLabel.Text = UiText.T("reasoning", filtered.Sum(x => x.Reasoning).ToString("N0"));
+        ScanStatus.Text = UiText.T("usageRows", filtered.Length, _rows.Count);
     }
 
     private void Filter_Changed(object sender, SelectionChangedEventArgs e) => ApplyFilters();
