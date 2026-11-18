@@ -43,6 +43,7 @@ public static class UiText
         ["binHint"] = ("Conversations are hidden, not deleted from disk.", "Le conversazioni sono nascoste, non cancellate dal disco."),
         ["moveToBin"] = ("Move to Bin", "Sposta nel Secchio"),
         ["restore"] = ("Restore conversation", "Ripristina conversazione"),
+        ["restoreFirst"] = ("Restore this conversation from the Bin before resuming it.", "Ripristina questa conversazione dal Secchio prima di riprenderla."),
         ["binConfirm"] = ("Move '{0}' to the Bin? The original conversation files will remain untouched.", "Spostare '{0}' nel Secchio? I file originali della conversazione resteranno intatti."),
         ["restoreConfirm"] = ("Restore this conversation?", "Ripristinare questa conversazione?"),
         ["activeMoveDenied"] = ("Close the active session before organizing it. No data was changed.", "Chiudi la sessione attiva prima di organizzarla. Nessun dato è stato modificato."),
