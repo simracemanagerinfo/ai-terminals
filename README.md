@@ -13,7 +13,7 @@ Each executable has its own terminal sessions, local folders, UI cache and icon.
 
 ## Installation and updates
 
-The latest published **stable** release is **v1.0.1**. It predates the virtual-folder and completion-notification previews.
+**Latest stable release: v1.1.0.** Includes completion notifications, virtual folders, the Bin, drag/drop and bilingual UI.
 
 PowerShell 7 (run from **any directory**, with the terminal windows closed):
 
@@ -24,7 +24,7 @@ Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/simracemanagerinfo/ai-
 & $installer -App Both
 ```
 
-The installer downloads verified GitHub Release assets, uses your existing GitHub authentication for Actions previews, and replaces the two fixed app directories without creating aliases. Use `-App Claude` or `-App Codex` to update just one app. An explicit `-RunId` downloads both packages from that **successful Windows Actions run** instead of the stable release.
+The installer downloads stable public GitHub Release assets **without a GitHub login**, uses your existing GitHub authentication only for Actions previews, and replaces the two fixed app directories without creating aliases. Use `-App Claude` or `-App Codex` to update just one app. An explicit `-RunId` downloads both packages from that **successful Windows Actions run** instead of the stable release.
 
 Permanent locations:
 
@@ -33,13 +33,13 @@ Permanent locations:
 
 The apps require their respective CLI installed and available in `PATH`, PowerShell 7, and WebView2 Runtime. No administrator rights are required by the portable apps themselves.
 
-## Features in the pending preview
+## Features in v1.1.0
 
-This branch is based on [completion notification PR #3](https://github.com/simracemanagerinfo/ai-terminals/pull/3) and is proposed in [folder/i18n PR #4](https://github.com/simracemanagerinfo/ai-terminals/pull/4). **Neither is part of the stable release yet.**
+Changes were developed in [PR #3](https://github.com/simracemanagerinfo/ai-terminals/pull/3) and [PR #4](https://github.com/simracemanagerinfo/ai-terminals/pull/4).
 
 ### Virtual conversation folders
 
-Each project can have custom organizational folders. Click **+ Folder** to create one. Use a folder's context menu to rename/remove it; removing a virtual folder moves its conversations back to **Unorganized**. Right-click a conversation in history to move it to any folder.
+Each project can have custom organizational folders. Click **+ Folder** to create one. Use a folder's context menu to rename/remove it; removing a virtual folder moves its conversations back to **Unorganized**. Right-click a conversation in history to move it to any folder, or **drag a history conversation onto a folder header**. Right-click a folder and choose **New conversation here** to start in that folder. Claude assigns the folder immediately; Codex assigns it after the first completed response supplies its persistent thread ID.
 
 **Bin** (Italian: **Secchio**) is a built-in last section, initially collapsed. Moving a conversation there **only hides it in this terminal**; the original Claude/Codex JSONL transcripts, indexes and CLI configuration remain untouched. You can **Restore** the chat to its previous folder. This is deliberately *not* physical deletion.
 
