@@ -51,6 +51,26 @@ try {
     catch { $blocked = $_.Exception.Message -like '*AllowExternalProcessing*' }
     Require $blocked 'Invio esterno non bloccato senza consenso esplicito'
 
+    # Test end-to-end della comunicazione con CLI mock su Windows.
+    # Entrambi i comandi sono script fittizi nel PATH temporaneo, senza rete.
+    $originalPath = $env:PATH
+    try {
+        $bin = Join-Path $temp 'bin'
+        [void](New-Item -ItemType Directory -Path $bin -Force)
+        $fakeResponse = '{"summary":"Risposta da CLI mock","topics":[],"decisions":[],"actions":[],"openQuestions":[],"timeline":[]}'
+        foreach ($exe in @('claude.cmd','codex.cmd')) {
+            [IO.File]::WriteAllLines((Join-Path $bin $exe), @('@echo off', ('echo ' + $fakeResponse), 'exit /b 0'), [Text.Encoding]::ASCII)
+        }
+        $env:PATH = "$bin;$originalPath"
+        foreach ($provider in @('Claude','Codex')) {
+            $cliResult = & $runner -TranscriptPath $transcript -Provider $provider -AllowExternalProcessing -OutputDirectory $out
+            Require (Test-Path -LiteralPath $cliResult.HtmlPath) "Il CLI mock $provider non ha generato HTML"
+            $cliHtml = Get-Content -LiteralPath $cliResult.HtmlPath -Raw -Encoding utf8
+            Require ($cliHtml.Contains('Risposta da CLI mock')) "Risposta $provider non preservata"
+        }
+    }
+    finally { $env:PATH = $originalPath }
+
     $bad = Join-Path $temp 'non-json.txt'
     [IO.File]::WriteAllText($bad, '{non valido', [Text.UTF8Encoding]::new($false))
     $failed = $false
