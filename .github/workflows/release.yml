@@ -50,7 +50,7 @@ jobs:
           foreach ($project in @('src/claude/ClaudeTerminal.csproj', 'src/codex/CodexTerminal.csproj')) {
             [xml]$xml = Get-Content -LiteralPath $project -Raw
             if ($xml.Project.PropertyGroup.Version -ne '1.1.0') {
-              throw "Unexpected version for $project: $($xml.Project.PropertyGroup.Version)"
+              throw "Unexpected version for ${project}: $($xml.Project.PropertyGroup.Version)"
             }
           }
 
