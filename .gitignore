@@ -8,3 +8,15 @@
 *.suo
 *.log
 .DS_Store
+
+# Meeting Notes: materiali potenzialmente riservati (mai in Git)
+/meeting-data/
+/meeting-output/
+/transcripts/
+/recordings/
+/audio/
+**/minutes.html
+**/minutes.json
+*.wav
+*.mp3
+*.m4a
