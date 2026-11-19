@@ -38,6 +38,9 @@ try {
     $plain = Get-Content -LiteralPath $result.TextPath -Raw -Encoding utf8
     Require ($plain.Contains('RIEPILOGO')) 'Riepilogo testo assente'
     Require ($plain.Contains('Verifica & test')) 'Titolo della email mancante dal testo'
+    Require ($plain.Contains('- Anomalie e qualità')) 'Argomenti non presenti nel testo'
+    Require ($plain.Contains('- Revisione del pannello non approvata.')) 'Questioni aperte non presenti nel testo'
+    Require ($plain.Contains('Responsabile: Anna')) 'Responsabilità non presente nel testo'
 
     $html = Get-Content -LiteralPath $result.HtmlPath -Raw -Encoding utf8
     Require ($html.Contains('Verifica &amp; test')) 'Titolo non escapato'
