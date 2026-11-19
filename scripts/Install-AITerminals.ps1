@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Claude','Codex','Both')][string]$App = 'Codex',
+    [ValidateSet('Claude','Codex','Both')][string]$App = 'Both',
     [long]$RunId = 0
 )
 Set-StrictMode -Version Latest
