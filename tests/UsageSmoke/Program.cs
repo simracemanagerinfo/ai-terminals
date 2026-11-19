@@ -158,6 +158,23 @@ try
     var first = CodexCompletionSignals.ReadNewTurnIds(signalsPath, ref readCount, seen);
     if (first.Count != 1 || first[0] != "turn-1")
         throw new Exception("Duplicate completion event was not suppressed");
+    // The CLI's first completed turn exposes its persistent thread ID.
+    var threadId = Guid.NewGuid().ToString("D");
+    if (!CodexCompletionSignals.TryGetThreadId("turn-1|" + threadId, out var parsedThread) ||
+        parsedThread != threadId ||
+        CodexCompletionSignals.TryGetThreadId("turn-1", out _) ||
+        CodexCompletionSignals.TryGetThreadId("turn-1|not-a-guid", out _))
+        throw new Exception("Codex completion thread-id parsing failed.");
+    // A new Codex chat can be assigned to a user folder only once its real
+    // thread identity is known. Do not invent a GUID for Codex.
+    var newCodexThread = Guid.NewGuid().ToString("D");
+    var codexAssignments = SessionOrganization.Open(Path.Combine(home, "codex-new-chat-folders.json"));
+    codexAssignments.Create(project, "Feature work");
+    var targetId = codexAssignments.Folders(project).Single().Id;
+    codexAssignments.Move(project, newCodexThread, targetId);
+    if (SessionOrganization.Open(Path.Combine(home, "codex-new-chat-folders.json"))
+            .FolderOf(project, newCodexThread) != targetId)
+        throw new Exception("Codex assigned thread did not persist in chosen folder.");
     File.AppendAllLines(signalsPath, ["turn-2", "turn-3"]);
     var second = CodexCompletionSignals.ReadNewTurnIds(signalsPath, ref readCount, seen);
     if (second.Count != 2 || second[0] != "turn-2" || second[1] != "turn-3" ||
