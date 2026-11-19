@@ -40,7 +40,7 @@ try {
     Require ($html.Contains('&lt;script&gt;')) 'Script non escapato'
     Require (-not $html.Contains('<img src=x')) 'Immagine HTML non escapata'
     Require ($html.Contains('Anna')) 'Responsabile assente'
-    Require ($html.Contains('venerdì')) 'UTF-8 non preservato'
+    Require ([Net.WebUtility]::HtmlDecode($html).Contains('venerdì')) 'UTF-8 non preservato'
     Require ($html.Contains('Content-Security-Policy')) 'Manca policy CSP'
     Require ($html.Contains('Minuta cronologica')) 'Manca cronologia'
     $second = & $runner @args
