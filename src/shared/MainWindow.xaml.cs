@@ -851,7 +851,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ConversationsList_PreviewMouseMove(object sender, MouseEventArgs e)
+    private void ConversationsList_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
         if (_draggingHistory is null) return;
         if (e.LeftButton != MouseButtonState.Pressed)
