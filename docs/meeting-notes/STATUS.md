@@ -37,6 +37,14 @@ consenso, input/JSON non validi, subprocess mock per entrambi i CLI.
 Le chiamate reali ai modelli non vengono effettuate in CI e restano
 da collaudare sul PC aziendale con account e policy autorizzati.
 
+## Layout Outlook (2026-11-19)
+- Il documento minutes.html ha ora un corpo email con paragrafi ed elenchi semplici,
+  senza banner, card, presentazione o controlli interattivi.
+- Tabella attività con colonne Attività, Responsabile, Scadenza.
+- Stili inline compatibili con il copia/incolla in Outlook, senza risorse esterne.
+- Generato anche minutes.txt, versione testuale di fallback.
+- Per provarlo occorre generare un nuovo verbale; i file precedenti non cambiano.
+
 ## Prossime fasi (NON ancora implementate)
 - UI MeetingNotes.exe autonoma con import TXT, generazione e anteprima.
 - Registrazione audio Windows (WASAPI) e trascrizione locale STT.
