@@ -34,6 +34,11 @@ try {
     $result = & $runner @args
     Require ($null -ne $result -and (Test-Path -LiteralPath $result.HtmlPath)) 'HTML non creato'
     Require (Test-Path -LiteralPath $result.JsonPath) 'JSON non creato'
+    Require (Test-Path -LiteralPath $result.TextPath) 'Versione testo non creata'
+    $plain = Get-Content -LiteralPath $result.TextPath -Raw -Encoding utf8
+    Require ($plain.Contains('RIEPILOGO')) 'Riepilogo testo assente'
+    Require ($plain.Contains('Verifica & test')) 'Titolo della email mancante dal testo'
+
     $html = Get-Content -LiteralPath $result.HtmlPath -Raw -Encoding utf8
     Require ($html.Contains('Verifica &amp; test')) 'Titolo non escapato'
     Require (-not $html.Contains('<script>')) 'Script HTML inserito in forma eseguibile'
@@ -43,6 +48,14 @@ try {
     Require ([Net.WebUtility]::HtmlDecode($html).Contains('venerdì')) 'UTF-8 non preservato'
     Require ($html.Contains('Content-Security-Policy')) 'Manca policy CSP'
     Require ($html.Contains('Minuta cronologica')) 'Manca cronologia'
+    Require ($html.Contains('Buongiorno,')) 'Manca introduzione email'
+    Require ($html.Contains('<table ')) 'Manca tabella attività compatibile con Outlook'
+    Require ($html.Contains('Attività e prossimi passi')) 'Manca il titolo delle attività'
+    Require (-not $html.Contains('class="card"')) 'Ancora presenti i riquadri della dashboard'
+    Require (-not $html.Contains('<main')) 'Ancora presente il layout della dashboard'
+    Require (-not $html.Contains('<script')) 'JavaScript non consentito nell email'
+    Require (-not $html.Contains('http://')) 'L email non deve richiamare contenuti esterni'
+    Require (-not $html.Contains('https://')) 'L email non deve richiamare contenuti esterni'
     $second = & $runner @args
     Require ($result.HtmlPath -ne $second.HtmlPath) 'La seconda esecuzione ha sovrascritto la prima'
 
