@@ -132,59 +132,142 @@ $actions = @(Get-List $data 'actions')
 $questions = @(Get-List $data 'openQuestions')
 $timeline = @(Get-List $data 'timeline')
 
+# HTML email-oriented: corpo compatto, soltanto formattazione inline supportata da Outlook.
+# Nessun contenitore dashboard, script, CSS esterno, link o immagini.
 $h = [Collections.Generic.List[string]]::new()
 $h.Add('<!doctype html><html lang="it"><head><meta charset="utf-8">')
 $h.Add('<meta name="viewport" content="width=device-width,initial-scale=1">')
 $h.Add('<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; style-src &#39;unsafe-inline&#39;; base-uri &#39;none&#39;; form-action &#39;none&#39;">')
 $h.Add('<title>' + (Esc $title) + ' — Minuta</title>')
-$h.Add(@'
-<style>
-:root{color-scheme:light;font-family:Segoe UI,system-ui,sans-serif;color:#203046;background:#eef2f5}
-body{margin:0;padding:32px 16px}main{max-width:900px;margin:auto;background:white;padding:40px 48px;border:1px solid #d7e0e7;border-radius:16px;box-shadow:0 12px 40px #182a4012}
-.kicker{color:#287c85;text-transform:uppercase;letter-spacing:.14em;font-weight:700;font-size:.75rem}
-h1{font-size:2rem;margin:12px 0}h2{font-size:1.16rem;margin-top:0;color:#173d52}
-header{border-bottom:1px solid #e6ebef;padding-bottom:24px}section{border-bottom:1px solid #e6ebef;padding:20px 0}
-p,li{line-height:1.65}li{margin:6px 0}.muted,.meta{color:#647687;font-size:.9rem}
-.card{padding:16px 20px;border-radius:12px;background:#f1f7f8}
-.entry{padding:12px 16px;margin:12px 0;background:#f8fafb;border-left:3px solid #2a8790}
-.entry strong,.entry small{display:block}.entry small{color:#647687;margin-top:6px}
-footer{font-size:.8rem;color:#647687;padding-top:22px}
-@media(max-width:650px){body{padding:0}main{border:0;padding:20px;border-radius:0}}
-@media print{body{padding:0;background:white}main{border:0;box-shadow:none;padding:0}section{break-inside:avoid}}
-</style>
-'@)
-$h.Add('</head><body><main><header><div class="kicker">Meeting Notes · Verbale</div>')
-$h.Add('<h1>' + (Esc $title) + '</h1>')
-$h.Add('<div class="meta">Generato il ' + (Esc (Get-Date -Format 'dd/MM/yyyy HH:mm')) +
-    ' · Italiano tecnico ' + $StyleLevel + '% · Bozza da verificare</div></header>')
-$h.Add('<section><h2>Riepilogo esecutivo</h2><div class="card"><p>' + (Esc $summary) + '</p></div></section>')
+$h.Add('</head><body style="font-family:Arial,Helvetica,sans-serif;font-size:11pt;line-height:1.45;color:#222222;background:#ffffff;margin:16px;">')
+$h.Add('<p style="margin:0 0 14px 0;">Buongiorno,</p>')
+$h.Add('<p style="margin:0 0 16px 0;">di seguito il riepilogo della riunione <strong>' + (Esc $title) + '</strong>.</p>')
+$h.Add('<p style="margin:0 0 12px 0;"><strong>Oggetto:</strong> Minuta — ' + (Esc $title) + '</p>')
+$h.Add('<p style="margin:18px 0 6px 0;"><strong>Riepilogo</strong></p>')
+$h.Add('<p style="margin:0 0 12px 0;">' + (Esc $summary) + '</p>')
 
-Add-ListSection $h 'Argomenti trattati' $topics
-$h.Add('<section><h2>Decisioni</h2>')
-if ($decisions.Count -eq 0) { $h.Add('<p class="muted">Nessuna decisione rilevata.</p>') }
+function Add-MailList([Collections.Generic.List[string]]$parts, [string]$heading, [object[]]$items) {
+    $parts.Add('<p style="margin:18px 0 6px 0;"><strong>' + (Esc $heading) + '</strong></p>')
+    if ($items.Count -eq 0) {
+        $parts.Add('<p style="margin:0 0 10px 0;">Nessun elemento rilevato.</p>')
+        return
+    }
+    $parts.Add('<ul style="margin:0 0 12px 0;padding-left:24px;">')
+    foreach ($item in $items) {
+        if ($item -is [string] -and -not [string]::IsNullOrWhiteSpace($item)) {
+            $parts.Add('<li style="margin:0 0 5px 0;">' + (Esc $item) + '</li>')
+        }
+    }
+    $parts.Add('</ul>')
+}
+
+Add-MailList $h 'Argomenti trattati' $topics
+$h.Add('<p style="margin:18px 0 6px 0;"><strong>Decisioni e proposte</strong></p>')
+if ($decisions.Count -eq 0) {
+    $h.Add('<p style="margin:0 0 10px 0;">Nessuna decisione rilevata.</p>')
+}
+else {
+    $h.Add('<ul style="margin:0 0 12px 0;padding-left:24px;">')
+    foreach ($d in $decisions) {
+        if ($d -isnot [Collections.IDictionary]) { continue }
+        $status = Get-Field $d 'status' 80
+        $h.Add('<li style="margin:0 0 5px 0;">' + (Esc (Get-Field $d 'statement' 3000)) +
+            ' <span style="color:#555555;">(Stato: ' + (Esc $status) + ')</span></li>')
+    }
+    $h.Add('</ul>')
+}
+
+$h.Add('<p style="margin:18px 0 6px 0;"><strong>Attività e prossimi passi</strong></p>')
+if ($actions.Count -eq 0) {
+    $h.Add('<p style="margin:0 0 10px 0;">Nessuna attività rilevata.</p>')
+}
+else {
+    # Solo HTML classico e stili inline: utilizzabile in Outlook desktop e web.
+    $h.Add('<table width="100%" cellpadding="6" cellspacing="0" border="1" style="border-collapse:collapse;border:1px solid #b6bdc3;font-family:Arial,Helvetica,sans-serif;font-size:10pt;margin:4px 0 14px 0;">')
+    $h.Add('<thead><tr style="background:#f1f2f4;"><th align="left" style="border:1px solid #b6bdc3;text-align:left;">Attività</th><th align="left" style="border:1px solid #b6bdc3;text-align:left;">Responsabile</th><th align="left" style="border:1px solid #b6bdc3;text-align:left;">Scadenza</th></tr></thead><tbody>')
+    foreach ($item in $actions) {
+        if ($item -isnot [Collections.IDictionary]) { continue }
+        $h.Add('<tr><td valign="top" style="border:1px solid #b6bdc3;">' +
+            (Esc (Get-Field $item 'description' 3000)) + '</td><td valign="top" style="border:1px solid #b6bdc3;">' +
+            (Esc (Get-Field $item 'owner' 200)) + '</td><td valign="top" style="border:1px solid #b6bdc3;">' +
+            (Esc (Get-Field $item 'dueDate' 100)) + '</td></tr>')
+    }
+    $h.Add('</tbody></table>')
+}
+Add-MailList $h 'Questioni aperte' $questions
+
+$h.Add('<p style="margin:18px 0 6px 0;"><strong>Minuta cronologica</strong></p>')
+if ($timeline.Count -eq 0) {
+    $h.Add('<p style="margin:0 0 10px 0;">Cronologia non disponibile.</p>')
+}
+else {
+    $h.Add('<ul style="margin:0 0 12px 0;padding-left:24px;">')
+    foreach ($event in $timeline) {
+        if ($event -isnot [Collections.IDictionary]) { continue }
+        $time = Get-Field $event 'time' 100
+        if ($time -eq 'Non specificato') {
+            $h.Add('<li style="margin:0 0 5px 0;">' + (Esc (Get-Field $event 'event' 3000)) + '</li>')
+        }
+        else {
+            $h.Add('<li style="margin:0 0 5px 0;"><strong>' + (Esc $time) + '</strong> — ' +
+                (Esc (Get-Field $event 'event' 3000)) + '</li>')
+        }
+    }
+    $h.Add('</ul>')
+}
+$h.Add('<p style="margin:18px 0 0 0;">Resto a disposizione per eventuali integrazioni o correzioni.</p>')
+$h.Add('</body></html>')
+
+# Versione testuale semplice come alternativa al copia/incolla HTML.
+$plain = [Collections.Generic.List[string]]::new()
+$plain.Add('Buongiorno,')
+$plain.Add('')
+$plain.Add('di seguito il riepilogo della riunione ' + $title + '.')
+$plain.Add('')
+$plain.Add('Oggetto: Minuta — ' + $title)
+$plain.Add('')
+$plain.Add('RIEPILOGO')
+$plain.Add($summary)
+$plain.Add('')
+foreach ($group in @(
+    @{ Label='ARGOMENTI TRATTATI'; Values=$topics },
+    @{ Label='QUESTIONI APERTE'; Values=$questions }
+)) {
+    $plain.Add($group.Label)
+    if ($group.Values.Count -eq 0) { $plain.Add('Nessun elemento rilevato.') }
+    foreach ($item in $group.Values) {
+        if ($item -is [string] -and -not [string]::IsNullOrWhiteSpace($item)) { $plain.Add('- ' + $item) }
+    }
+    $plain.Add('')
+}
+$plain.Add('DECISIONI E PROPOSTE')
+if ($decisions.Count -eq 0) { $plain.Add('Nessuna decisione rilevata.') }
 foreach ($d in $decisions) {
-    if ($d -isnot [Collections.IDictionary]) { continue }
-    $h.Add('<div class="entry"><strong>' + (Esc (Get-Field $d 'statement' 3000)) + '</strong><small>Stato: ' +
-        (Esc (Get-Field $d 'status' 80)) + '</small></div>')
+    if ($d -is [Collections.IDictionary]) {
+        $plain.Add('- ' + (Get-Field $d 'statement' 3000) + ' (Stato: ' + (Get-Field $d 'status' 80) + ')')
+    }
 }
-$h.Add('</section>')
-$h.Add('<section><h2>Attività</h2>')
-if ($actions.Count -eq 0) { $h.Add('<p class="muted">Nessuna attività rilevata.</p>') }
-foreach ($a in $actions) {
-    if ($a -isnot [Collections.IDictionary]) { continue }
-    $h.Add('<div class="entry"><strong>' + (Esc (Get-Field $a 'description' 3000)) + '</strong><small>Responsabile: ' +
-        (Esc (Get-Field $a 'owner' 200)) + ' · Scadenza: ' + (Esc (Get-Field $a 'dueDate' 100)) + '</small></div>')
+$plain.Add('')
+$plain.Add('ATTIVITÀ E PROSSIMI PASSI')
+if ($actions.Count -eq 0) { $plain.Add('Nessuna attività rilevata.') }
+foreach ($item in $actions) {
+    if ($item -is [Collections.IDictionary]) {
+        $plain.Add('- ' + (Get-Field $item 'description' 3000) + ' | Responsabile: ' +
+            (Get-Field $item 'owner' 200) + ' | Scadenza: ' + (Get-Field $item 'dueDate' 100))
+    }
 }
-$h.Add('</section>')
-Add-ListSection $h 'Questioni aperte' $questions
-$h.Add('<section><h2>Minuta cronologica</h2>')
-if ($timeline.Count -eq 0) { $h.Add('<p class="muted">Cronologia non disponibile.</p>') }
-foreach ($t in $timeline) {
-    if ($t -isnot [Collections.IDictionary]) { continue }
-    $h.Add('<div class="entry"><strong>' + (Esc (Get-Field $t 'event' 3000)) + '</strong><small>Orario: ' +
-        (Esc (Get-Field $t 'time' 100)) + '</small></div>')
+$plain.Add('')
+$plain.Add('MINUTA CRONOLOGICA')
+if ($timeline.Count -eq 0) { $plain.Add('Cronologia non disponibile.') }
+foreach ($event in $timeline) {
+    if ($event -is [Collections.IDictionary]) {
+        $time = Get-Field $event 'time' 100
+        if ($time -eq 'Non specificato') { $time = '' }
+        $plain.Add('- ' + $time + ' ' + (Get-Field $event 'event' 3000))
+    }
 }
-$h.Add('</section><footer>Documento generato automaticamente. Verificare il contenuto prima della diffusione. Nessuna risorsa esterna.</footer></main></body></html>')
+$plain.Add('')
+$plain.Add('Resto a disposizione per eventuali integrazioni o correzioni.')
 
 $root = if ($OutputDirectory) { $OutputDirectory } else {
     Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'AI-Terminals\MeetingNotes'
@@ -193,6 +276,8 @@ $folder = Join-Path $root ('meeting-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '
 [void](New-Item -ItemType Directory -Path $folder -Force)
 $htmlPath = Join-Path $folder 'minutes.html'
 $jsonPath = Join-Path $folder 'minutes.json'
+$textPath = Join-Path $folder 'minutes.txt'
 [IO.File]::WriteAllText($htmlPath, ($h -join [Environment]::NewLine), [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText($jsonPath, ($data | ConvertTo-Json -Depth 25), [Text.UTF8Encoding]::new($false))
-[pscustomobject]@{ HtmlPath = $htmlPath; JsonPath = $jsonPath; Provider = $Provider; Items = ($decisions.Count + $actions.Count) }
+[IO.File]::WriteAllText($textPath, ($plain -join [Environment]::NewLine), [Text.UTF8Encoding]::new($false))
+[pscustomobject]@{ HtmlPath = $htmlPath; JsonPath = $jsonPath; TextPath = $textPath; Provider = $Provider; Items = ($decisions.Count + $actions.Count) }
