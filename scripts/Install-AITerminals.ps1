@@ -36,14 +36,19 @@ function Get-GitHubToken {
     throw 'Credenziali GitHub non disponibili. Autentica gh o Git Credential Manager; non scaricare ZIP manualmente.'
 }
 
-$token = Get-GitHubToken
+# Public GitHub Releases can be fetched anonymously. Do not require
+# GitHub CLI or tokens on a fresh Windows installation.
 $headers = @{
     Accept = 'application/vnd.github+json'
-    Authorization = "Bearer $token"
     'User-Agent' = 'AI-Terminals-Installer'
     'X-GitHub-Api-Version' = '2022-11-28'
 }
-$token = $null
+function Use-GitHubAuthentication {
+    $token = Get-GitHubToken
+    $headers.Authorization = "Bearer $token"
+    $token = $null
+}
+if ($RunId -gt 0) { Use-GitHubAuthentication }
 
 function Select-Build {
     if ($RunId -gt 0) {
@@ -76,6 +81,7 @@ if ($RunId -eq 0) {
 }
 
 if ($null -eq $release) {
+    if (-not $headers.ContainsKey('Authorization')) { Use-GitHubAuthentication }
     $run = Select-Build
     if ($run.status -ne 'completed' -or $run.conclusion -ne 'success') {
         throw "Il workflow $($run.id) non e riuscito: installazione annullata."
@@ -159,6 +165,7 @@ foreach ($agent in $apps) {
             $exeName,
             'wwwroot\index.html',
             "scripts\Start-${agent}Session.ps1",
+            "scripts\Notify-${agent}Turn.ps1",
             "assets\$($agent.ToLowerInvariant())-terminal.png"
         )
         foreach ($file in $required) {
