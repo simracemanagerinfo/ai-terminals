@@ -74,7 +74,7 @@ function Invoke-MeetingProvider([string]$name, [string]$prompt, [int]$timeout) {
         $out = $outTask.GetAwaiter().GetResult()
         [void]$errTask.GetAwaiter().GetResult()
         if ($proc.ExitCode -ne 0) {
-            throw "Provider $name: errore codice $($proc.ExitCode). Controllare login/CLI e autorizzazioni. Output diagnostico omesso per privacy."
+            throw "Provider ${name}: errore codice $($proc.ExitCode). Controllare login/CLI e autorizzazioni. Output diagnostico omesso per privacy."
         }
         if ([string]::IsNullOrWhiteSpace($out)) { throw 'Il provider ha restituito una risposta vuota.' }
         return $out
