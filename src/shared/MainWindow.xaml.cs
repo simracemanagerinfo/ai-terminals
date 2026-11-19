@@ -30,6 +30,8 @@ public partial class MainWindow : Window
     private SessionOrganization? _organization;
     private string? _organizationLoadError;
     private bool _applyingLanguage;
+    private System.Windows.Point _dragStart;
+    private HistoryEntry? _draggingHistory;
     private readonly ConcurrentQueue<(string Id, string Text)> _output = new();
     private readonly DispatcherTimer _flushTimer = new() { Interval = TimeSpan.FromMilliseconds(30) };
     private readonly DispatcherTimer _titleRefreshTimer = new() { Interval = TimeSpan.FromSeconds(15) };
@@ -279,7 +281,8 @@ public partial class MainWindow : Window
         return value.Append('"').ToString();
     }
 
-    private async Task StartSessionAsync(HistoryEntry? existing = null, bool diagnosticShell = false)
+    private async Task StartSessionAsync(HistoryEntry? existing = null, bool diagnosticShell = false,
+        string? virtualFolderId = null)
     {
         if (!_webReady || _project is null)
         {
@@ -287,6 +290,16 @@ public partial class MainWindow : Window
             return;
         }
         var provider = TerminalBrand.Provider;
+        // A new conversation can be pre-filed. A resumed conversation retains
+        // its existing folder, and never inherits this optional destination.
+        if (virtualFolderId is not null &&
+            (existing is not null || diagnosticShell || _organization is null ||
+             (virtualFolderId != SessionOrganization.Unfiled &&
+              !_organization.Folders(_project).Any(folder => folder.Id == virtualFolderId))))
+        {
+            ShowError(UiText.T("folderNotFound"));
+            return;
+        }
         if (existing is not null && existing.Provider != provider)
         {
             ShowError(UiText.T("wrongProvider"));
@@ -340,7 +353,10 @@ public partial class MainWindow : Window
         var label = diagnosticShell
             ? UiText.T("diagnosticShell", DateTime.Now.ToString("HH:mm:ss"))
             : existing?.Title ?? UiText.T("newChatLabel", DateTime.Now.ToString("HH:mm:ss"));
-        var item = new LiveItem(id, label, claudeId, _project, pty, provider, completionSignalPath);
+        var item = new LiveItem(id, label, claudeId, _project, pty, provider, completionSignalPath)
+        {
+            PendingFolderId = virtualFolderId
+        };
         _sessions.Add(id, item);
         _live.Add(item);
         Send(new { type = "create", id, label,
@@ -377,6 +393,21 @@ public partial class MainWindow : Window
                 item.Status = "In esecuzione";
             UpdateSidebar();
             FooterStatus.Text = UiText.T("terminalStarted", TerminalBrand.Provider);
+            // Claude knows its persistent identity at creation. Codex generates
+            // its own identity; its completion event supplies the thread-id later.
+            if (item.PendingFolderId is { } folder && claudeId is not null &&
+                _organization is not null)
+            {
+                try
+                {
+                    _organization.Move(item.ProjectPath, claudeId, folder);
+                    item.PendingFolderId = null;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+                {
+                    FooterStatus.Text = UiText.T("organizationError", ex.Message);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -451,6 +482,27 @@ public partial class MainWindow : Window
                 session.CompletionSignalPath, ref read, session.SeenNotifications);
             session.NotificationsRead = read;
             if (turns.Count == 0) continue;
+
+            if (session.Provider == "Codex")
+            {
+                foreach (var marker in turns)
+                {
+                    if (!CodexCompletionSignals.TryGetThreadId(marker, out var threadId))
+                        continue;
+                    session.ClaudeSessionId ??= threadId;
+                    if (session.PendingFolderId is not { } folder || _organization is null)
+                        continue;
+                    try
+                    {
+                        _organization.Move(session.ProjectPath, threadId, folder);
+                        session.PendingFolderId = null;
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+                    {
+                        FooterStatus.Text = UiText.T("organizationError", ex.Message);
+                    }
+                }
+            }
 
             session.Unread = true;
             changed = true;
@@ -991,7 +1043,8 @@ public partial class MainWindow : Window
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Label)));
             }
         }
-        public string? ClaudeSessionId { get; }
+        public string? ClaudeSessionId { get; set; }
+        public string? PendingFolderId { get; set; }
         public string? CompletionSignalPath { get; }
         public int NotificationsRead { get; set; }
         public HashSet<string> SeenNotifications { get; } = new(StringComparer.Ordinal);
