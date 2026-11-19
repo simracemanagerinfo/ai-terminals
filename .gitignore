@@ -17,6 +17,7 @@
 /audio/
 **/minutes.html
 **/minutes.json
+**/minutes.txt
 *.wav
 *.mp3
 *.m4a
