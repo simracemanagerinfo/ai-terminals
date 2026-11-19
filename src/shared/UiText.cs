@@ -28,6 +28,7 @@ public static class UiText
         ["refreshHint"] = ("Refresh local history", "Aggiorna storico dal disco"),
         ["conversations"] = ("CONVERSATIONS", "CONVERSAZIONI"),
         ["newConversation"] = ("+ New conversation", "+ Nuova conversazione"),
+        ["newConversationInFolder"] = ("New conversation here", "Nuova conversazione qui"),
         ["newFolder"] = ("+ Folder", "+ Cartella"),
         ["newFolderHint"] = ("Create a virtual folder for this project", "Crea una cartella virtuale per questo progetto"),
         ["folderName"] = ("Folder name", "Nome cartella"),
