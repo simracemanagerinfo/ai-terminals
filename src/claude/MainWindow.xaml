@@ -95,6 +95,11 @@
                  SelectionChanged="ConversationsList_SelectionChanged"
                  MouseDoubleClick="ConversationsList_MouseDoubleClick"
                  ContextMenuOpening="ConversationsList_ContextMenuOpening"
+                 PreviewMouseLeftButtonDown="ConversationsList_PreviewMouseLeftButtonDown"
+                 PreviewMouseMove="ConversationsList_PreviewMouseMove"
+                 DragOver="ConversationsList_DragOver"
+                 Drop="ConversationsList_Drop"
+                 AllowDrop="True"
                  Background="Transparent" BorderThickness="0"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
           <ListBox.ItemTemplate>
