@@ -70,6 +70,9 @@ installata prima di adattare lo script.
 Ogni esecuzione salva, senza sovrascrivere:
 - minutes.html: verbale HTML autosufficiente, CSS interno, CSP e testo escapato;
 - minutes.json: risultato strutturato per integrazioni successive.
+- minutes.txt: testo semplice per incollare in Outlook senza formattazione.
+
+Il file minutes.html ora usa il layout di un **corpo email Outlook**: saluto, breve introduzione, titoli semplici, elenchi e tabella delle attività con stili HTML inline. Non è una dashboard. Per riutilizzarlo: aprire il file in Edge/Chrome, premere Ctrl+A e Ctrl+C, aprire un nuovo messaggio di Outlook in formato HTML e incollare nel corpo. Non serve allegare l'HTML. È normale che l'HTML creato in precedenza rimanga con il vecchio layout: occorre rigenerare la minuta.
 
 Percorso predefinito: %LOCALAPPDATA%\AI-Terminals\MeetingNotes\meeting-....
 Con -OutputDirectory si può scegliere una cartella locale alternativa.
