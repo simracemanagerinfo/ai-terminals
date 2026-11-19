@@ -835,6 +835,83 @@ public partial class MainWindow : Window
         _project is not null && _organization?.FolderOf(_project, session.Id)
             == SessionOrganization.Bin;
 
+    // Dragging is available only for inactive history conversations. We do not
+    // accept external drag payloads: the actual session is held in-memory.
+    private void ConversationsList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _draggingHistory = null;
+        var element = e.OriginalSource as DependencyObject;
+        var item = element is null ? null :
+            ItemsControl.ContainerFromElement(ConversationsList, element) as ListBoxItem;
+        if (item?.DataContext is SidebarRow { History: { } history } &&
+            history.Directory.Equals(_project, StringComparison.OrdinalIgnoreCase))
+        {
+            _dragStart = e.GetPosition(ConversationsList);
+            _draggingHistory = history;
+        }
+    }
+
+    private void ConversationsList_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_draggingHistory is null) return;
+        if (e.LeftButton != MouseButtonState.Pressed)
+        {
+            _draggingHistory = null;
+            return;
+        }
+        var position = e.GetPosition(ConversationsList);
+        if (Math.Abs(position.X - _dragStart.X) <= SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(position.Y - _dragStart.Y) <= SystemParameters.MinimumVerticalDragDistance)
+            return;
+
+        try
+        {
+            System.Windows.DragDrop.DoDragDrop(
+                ConversationsList,
+                new System.Windows.DataObject("AITerminalsLocalSession", _draggingHistory.Id),
+                System.Windows.DragDropEffects.Move);
+        }
+        finally { _draggingHistory = null; }
+    }
+
+    private string? DropDestination(object originalSource)
+    {
+        var source = originalSource as DependencyObject;
+        var target = source is null ? null :
+            ItemsControl.ContainerFromElement(ConversationsList, source) as ListBoxItem;
+        return target?.DataContext is SidebarRow { IsHeader: true, FolderId: { } folderId }
+            ? folderId : null;
+    }
+
+    private void ConversationsList_DragOver(object sender, System.Windows.DragEventArgs e)
+    {
+        if (_draggingHistory is not null &&
+            e.Data.GetDataPresent("AITerminalsLocalSession") &&
+            DropDestination(e.OriginalSource) is not null)
+            e.Effects = System.Windows.DragDropEffects.Move;
+        else
+            e.Effects = System.Windows.DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void ConversationsList_Drop(object sender, System.Windows.DragEventArgs e)
+    {
+        var conversation = _draggingHistory;
+        var destination = DropDestination(e.OriginalSource);
+        if (conversation is not null && destination is not null &&
+            e.Data.GetDataPresent("AITerminalsLocalSession") &&
+            _project is not null &&
+            conversation.Directory.Equals(_project, StringComparison.OrdinalIgnoreCase))
+        {
+            MoveHistory(conversation, destination);
+            e.Effects = System.Windows.DragDropEffects.Move;
+        }
+        else
+            e.Effects = System.Windows.DragDropEffects.None;
+        e.Handled = true;
+        _draggingHistory = null;
+    }
+
     private void ConversationsList_ContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
         var source = e.OriginalSource as DependencyObject;
@@ -853,11 +930,19 @@ public partial class MainWindow : Window
             return item;
         }
 
-        if (row.IsHeader && row.FolderId is { Length: > 0 } folderId &&
+        if (row.IsHeader && row.FolderId is { } folderId &&
             folderId != SessionOrganization.Bin)
         {
-            menu.Items.Add(Item(UiText.T("folderRename"), () => RenameFolder(folderId)));
-            menu.Items.Add(Item(UiText.T("folderDelete"), () => RemoveFolder(folderId)));
+            var targetFolderId = folderId;
+            var newChat = new MenuItem { Header = UiText.T("newConversationInFolder") };
+            newChat.Click += async (_, _) => await StartSessionAsync(virtualFolderId: targetFolderId);
+            menu.Items.Add(newChat);
+            if (folderId.Length > 0)
+            {
+                menu.Items.Add(new Separator());
+                menu.Items.Add(Item(UiText.T("folderRename"), () => RenameFolder(folderId)));
+                menu.Items.Add(Item(UiText.T("folderDelete"), () => RemoveFolder(folderId)));
+            }
         }
         else if (row.History is { } conversation)
         {
