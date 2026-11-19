@@ -22,7 +22,19 @@ try {
     $folder = [IO.Path]::GetDirectoryName($SignalPath)
     if (-not [IO.Directory]::Exists($folder)) { return }
 
-    Add-Content -LiteralPath $SignalPath -Value $turnId -Encoding utf8
+    # The thread ID is the persistent Codex conversation identity. Keep it
+    # alongside the completion token so a newly created chat can be placed
+    # in the selected virtual folder after Codex assigns its own ID.
+    # Never store prompts, assistant messages, cwd or any other payload data.
+    $threadId = [string]$notification['thread-id']
+    $threadGuid = [guid]::Empty
+    if ([guid]::TryParse($threadId, [ref]$threadGuid)) {
+        $marker = $turnId + '|' + $threadGuid.ToString('D')
+    }
+    else {
+        $marker = $turnId
+    }
+    Add-Content -LiteralPath $SignalPath -Value $marker -Encoding utf8
 }
 catch {
     # A notification must never break an interactive Codex session.
