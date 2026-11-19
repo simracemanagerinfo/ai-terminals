@@ -229,17 +229,18 @@ $plain.Add('')
 $plain.Add('RIEPILOGO')
 $plain.Add($summary)
 $plain.Add('')
-foreach ($group in @(
-    @{ Label='ARGOMENTI TRATTATI'; Values=$topics },
-    @{ Label='QUESTIONI APERTE'; Values=$questions }
-)) {
-    $plain.Add($group.Label)
-    if ($group.Values.Count -eq 0) { $plain.Add('Nessun elemento rilevato.') }
-    foreach ($item in $group.Values) {
-        if ($item -is [string] -and -not [string]::IsNullOrWhiteSpace($item)) { $plain.Add('- ' + $item) }
-    }
-    $plain.Add('')
+$plain.Add('ARGOMENTI TRATTATI')
+if ($topics.Count -eq 0) { $plain.Add('Nessun elemento rilevato.') }
+foreach ($item in $topics) {
+    if ($item -is [string] -and -not [string]::IsNullOrWhiteSpace($item)) { $plain.Add('- ' + $item) }
 }
+$plain.Add('')
+$plain.Add('QUESTIONI APERTE')
+if ($questions.Count -eq 0) { $plain.Add('Nessun elemento rilevato.') }
+foreach ($item in $questions) {
+    if ($item -is [string] -and -not [string]::IsNullOrWhiteSpace($item)) { $plain.Add('- ' + $item) }
+}
+$plain.Add('')
 $plain.Add('DECISIONI E PROPOSTE')
 if ($decisions.Count -eq 0) { $plain.Add('Nessuna decisione rilevata.') }
 foreach ($d in $decisions) {
