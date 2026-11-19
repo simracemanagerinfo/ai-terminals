@@ -11,7 +11,7 @@ I progetti in `src/claude/` e `src/codex/` compilano lo stesso codice `src/share
 
 ## Versione stabile
 
-**Release stabile attuale: v1.0.1** (prima versione: v1.0.0). Due EXE Windows indipendenti, con identità grafica, cache, processi e cronologia separati. Il progetto `powershell-personalizzation` non viene modificato; qui non vengono aggiunti alias o profili globali.
+**Release stabile attuale: v1.1.0** (prima versione: v1.0.0). Due EXE Windows indipendenti, con identità grafica, cache, processi e cronologia separati. Il progetto `powershell-personalizzation` non viene modificato; qui non vengono aggiunti alias o profili globali.
 
 ## Build Windows
 
@@ -33,16 +33,18 @@ dotnet publish src/codex/CodexTerminal.csproj -c Release -r win-x64 --self-conta
 
 Non si scaricano ZIP manualmente e non si creano alias PowerShell.
 
-Per installare o aggiornare entrambe le applicazioni, usando soltanto GitHub:
+Per installare o aggiornare entrambe le applicazioni, da una qualunque directory con PowerShell 7:
 ```powershell
-& '.\scripts\Install-AITerminals.ps1' -App Both
+$ErrorActionPreference = 'Stop'
+$installer = Join-Path $env:TEMP 'Install-AITerminals.ps1'
+Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/simracemanagerinfo/ai-terminals/main/scripts/Install-AITerminals.ps1' -OutFile $installer
+& $installer -App Both
 ```
 
 Lo script preferisce l'ultima **GitHub Release stabile**, verifica SHA-256 dei
 pacchetti e aggiorna le due cartelle senza installazioni duplicate. Prima della
 pubblicazione della prima release (o con `-RunId` esplicito) può usare gli
-artifact GitHub Actions. Usa le credenziali GitHub locali già disponibili,
-senza richiedere download ZIP manuali. Per aggiornare un solo programma:
+artifact GitHub Actions. Per le release stabili pubbliche non servono credenziali GitHub; per le anteprime GitHub Actions viene utilizzata l'autenticazione locale. Per aggiornare un solo programma:
 `-App Claude` oppure `-App Codex`.
 
 La directory di Claude rimane quella esistente
@@ -64,7 +66,7 @@ l'operazione senza cancellare nulla.
 - GitHub Actions verificano le combinazioni nel renderer e compilano entrambi gli EXE. Il test basso livello `ReadConsoleInputW` non è eseguibile in modo affidabile sul runner senza desktop: il comportamento nella TUI Codex va confermato sul PC Windows.
 - Aggiornamento in-place senza cartelle residue.
 
-## Anteprima: avviso risposta completata (Claude e Codex)
+## Avviso risposta completata (Claude e Codex)
 
 - Entrambi i terminali distinguono il completamento della risposta dai normali pause/ritardi: Codex usa il suo evento `agent-turn-complete`, Claude usa l'hook nativo `Stop`.
 - A finestra attiva **nessun popup**, ma evidenziazione della chat completata (arancione Claude, teal Codex). Il segnale sparisce quando apri o usi quella chat; non cancella gli indicatori delle altre.
@@ -80,12 +82,13 @@ L'app legge transcript JSONL locali solo per storico e statistiche di token; **n
 L'icona Codex in questa fase è un marchio grafico personalizzato grafite/teal, non il logo ufficiale di OpenAI.
 
 
-## Anteprima: cartelle virtuali e internazionalizzazione
+## Cartelle virtuali e internazionalizzazione
 
 - **Secchio** è sempre l'ultima cartella e resta inizialmente chiuso. Spostare una conversazione qui la nasconde senza toccare transcript JSONL o indici. Si può ripristinare nella cartella precedente.
 - Le cartelle sono **virtuali per progetto** e vengono salvate in `%LOCALAPPDATA%\PowerShellCustomization\ai-terminals-claude-folders.json` oppure `ai-terminals-codex-folders.json`, mai nella cartella di codice del progetto.
 - Per creare una cartella usa `+ Cartella`; clicca una cartella per espandere/ridurre. Con il tasto destro su una cartella puoi rinominarla o rimuoverla (le chat tornano fra quelle non organizzate).
-- Con il tasto destro su una chat dello storico puoi spostarla in una cartella, nel Secchio o ripristinarla. Le sessioni in esecuzione rimangono nella sezione dedicata; chiudile prima di organizzarle.
+- Con il tasto destro su una chat dello storico puoi spostarla in una cartella, nel Secchio o ripristinarla.
+- Puoi anche trascinare una conversazione dello storico sopra una cartella (drag & drop). Dal tasto destro sulla cartella scegli **Nuova conversazione qui** per avviarla direttamente in quella categoria. Per Claude il collegamento è immediato; per Codex viene assegnato al completamento della prima risposta, quando si conosce il vero ID della sessione. Le sessioni in esecuzione rimangono nella sezione dedicata; chiudile prima di organizzarle.
 - **Lingua**: selettore in alto a sinistra, English/Italiano; inizialmente segue la lingua di Windows, inglese come fallback. La preferenza è condivisa tra i due terminali e sopravvive al riavvio.
 - Nessun archivio o transcript viene eliminato fisicamente.
-- Funzioni in anteprima sul branch `feature/virtual-folders-bin-i18n`, costruito sopra la PR #3; la release stabile v1.0.1 non le contiene ancora.
+- Funzioni incluse in v1.1.0, con codice condiviso e installazione negli stessi due percorsi.
