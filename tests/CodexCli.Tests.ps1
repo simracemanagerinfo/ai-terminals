@@ -50,13 +50,14 @@ try {
     }
 
     # Hook records ONLY completion IDs; no prompt, reply or private data.
-    $completed = '{"type":"agent-turn-complete","turn-id":"turn-1","client":"codex-tui","last-assistant-message":"secret"}'
+    $threadId = [guid]::NewGuid().ToString('D')
+    $completed = "{`"type`":`"agent-turn-complete`",`"turn-id`":`"turn-1`",`"thread-id`":`"$threadId`",`"client`":`"codex-tui`",`"last-assistant-message`":`"secret`"}"
     # Codex appends the JSON payload as an unnamed final argument.
     & pwsh.exe -NoLogo -NoProfile -File $hook $signal $completed
     & pwsh.exe -NoLogo -NoProfile -File $hook -SignalPath $signal -EventJson '{"type":"approval-requested","turn-id":"turn-2"}'
     & pwsh.exe -NoLogo -NoProfile -File $hook -SignalPath $signal -EventJson '{"type":"agent-turn-complete","turn-id":"subagent","client":"codex-exec"}'
     $lines = @(Get-Content -LiteralPath $signal)
-    if ($lines.Count -ne 1 -or $lines[0] -ne 'turn-1' -or
+    if ($lines.Count -ne 1 -or $lines[0] -ne "turn-1|$threadId" -or
         (Get-Content -LiteralPath $signal -Raw).Contains('secret')) {
         throw 'Codex hook leaked content or captured a non-TUI completion'
     }
