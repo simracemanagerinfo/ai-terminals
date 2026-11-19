@@ -8,6 +8,18 @@ namespace ClaudeTerminal.Host;
 /// </summary>
 public static class CodexCompletionSignals
 {
+    // Codex assigns its own stable thread ID; this is only available from
+    // the completion hook, not when starting a new interactive TUI.
+    public static bool TryGetThreadId(string marker, out string threadId)
+    {
+        threadId = "";
+        var separator = marker.LastIndexOf('|');
+        if (separator <= 0 || separator == marker.Length - 1) return false;
+        if (!Guid.TryParse(marker[(separator + 1)..], out var parsed)) return false;
+        threadId = parsed.ToString("D");
+        return true;
+    }
+
     public static IReadOnlyList<string> ReadNewTurnIds(string? path, ref int readCount, HashSet<string> seen)
     {
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) return [];
@@ -21,7 +33,7 @@ public static class CodexCompletionSignals
             for (var i = readCount; i < lines.Length; i++)
             {
                 var id = lines[i].Trim();
-                if (id.Length is > 0 and <= 128 && seen.Add(id))
+                if (id.Length is > 0 and <= 180 && seen.Add(id))
                     newTurns.Add(id);
             }
             readCount = lines.Length;
