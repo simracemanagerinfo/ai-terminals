@@ -26,22 +26,22 @@
     </Grid.RowDefinitions>
     <DockPanel Grid.Row="0" Margin="0,0,0,16">
       <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-        <Button Content="Ricalcola" Click="Refresh_Click" Background="#D97757"/>
-        <Button Content="Chiudi" Click="Close_Click"/>
+        <Button x:Name="UsageRefreshButton" Content="Ricalcola" Click="Refresh_Click" Background="#D97757"/>
+        <Button x:Name="UsageCloseButton" Content="Chiudi" Click="Close_Click"/>
       </StackPanel>
       <StackPanel>
-        <TextBlock Text="Utilizzo token locale" FontSize="22" FontWeight="Bold" Foreground="#E79D7D"/>
-        <TextBlock Text="Claude Code · statistiche dai file JSONL locali"
+        <TextBlock x:Name="UsageTitleLabel" Text="Utilizzo token locale" FontSize="22" FontWeight="Bold" Foreground="#E79D7D"/>
+        <TextBlock x:Name="UsageSubtitleLabel" Text="Claude Code · statistiche dai file JSONL locali"
                    Foreground="#BFA796" FontSize="12" Margin="0,6,0,0"/>
       </StackPanel>
     </DockPanel>
     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
-      <TextBlock Text="Agente" VerticalAlignment="Center" Margin="0,0,8,0"/>
+      <TextBlock x:Name="AgentLabel" Text="Agente" VerticalAlignment="Center" Margin="0,0,8,0"/>
       <ComboBox x:Name="ProviderFilter" Width="126" Margin="0,0,18,0"
                 Background="#352721" Foreground="Black" SelectionChanged="Filter_Changed">
         <ComboBoxItem Content="Claude" IsSelected="True"/>
       </ComboBox>
-      <TextBlock Text="Ambito" VerticalAlignment="Center" Margin="0,0,8,0"/>
+      <TextBlock x:Name="ScopeLabel" Text="Ambito" VerticalAlignment="Center" Margin="0,0,8,0"/>
       <ComboBox x:Name="ScopeFilter" Width="170"
                 Background="#352721" Foreground="Black" SelectionChanged="Filter_Changed">
         <ComboBoxItem Content="Tutti i progetti" IsSelected="True"/>
@@ -86,7 +86,7 @@
       </DataGrid.Columns>
     </DataGrid>
     <StackPanel Grid.Row="4" Margin="0,12,0,0">
-      <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#BBA497"
+      <TextBlock x:Name="UsageInfoLabel" TextWrapping="Wrap" FontSize="11" Foreground="#BBA497"
                  Text="Misure ricostruite dai transcript ancora presenti sul PC: non rappresentano quota residua o fatturazione dell’account. I token di cache Codex sono già inclusi nell’input; il ragionamento è incluso nell’output. I costi non sono stimati."/>
       <TextBlock x:Name="ErrorLabel" TextWrapping="Wrap" Foreground="#F2A88E" Margin="0,7,0,0"/>
     </StackPanel>

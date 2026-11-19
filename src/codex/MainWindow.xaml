@@ -25,10 +25,22 @@
       <Setter Property="Margin" Value="0,2,0,3"/>
       <Setter Property="Background" Value="#1C2A31"/>
       <Setter Property="Foreground" Value="#ECF8F9"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
       <Style.Triggers>
         <Trigger Property="IsSelected" Value="True">
           <Setter Property="Background" Value="#275767"/>
         </Trigger>
+        <DataTrigger Binding="{Binding IsHeader}" Value="True">
+          <Setter Property="FontWeight" Value="Bold"/>
+          <Setter Property="Padding" Value="7"/>
+          <Setter Property="Margin" Value="0,9,0,3"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding IsUnread}" Value="True">
+          <Setter Property="Background" Value="#205962"/>
+          <Setter Property="BorderBrush" Value="#66EEE7"/>
+          <Setter Property="BorderThickness" Value="2"/>
+        </DataTrigger>
       </Style.Triggers>
     </Style>
   </Window.Resources>
@@ -44,8 +56,8 @@
                    Text="Scegli un progetto. Nessuna sessione attiva." FontSize="11"/>
         <StackPanel DockPanel.Dock="Top">
           <TextBlock Text="CODEX TERMINAL" Foreground="#5DAEB5" FontWeight="Bold" FontSize="18" Margin="0,0,0,3"/>
-          <TextBlock Text="CONPTY · MULTISESSIONE" Foreground="#92A8B0" FontSize="11" Margin="0,0,0,16"/>
-          <TextBlock Text="Progetto" Margin="0,0,0,6" FontWeight="SemiBold"/>
+          <TextBlock x:Name="SubtitleLabel" Text="CONPTY · MULTISESSIONE" Foreground="#92A8B0" FontSize="11" Margin="0,0,0,16"/>
+          <TextBlock x:Name="ProjectLabel" Text="Progetto" Margin="0,0,0,6" FontWeight="SemiBold"/>
           <ComboBox x:Name="ProjectCombo" Height="32" IsEditable="True" Margin="0,0,0,9"/>
           <StackPanel Orientation="Horizontal" Margin="0,0,0,17">
             <Button x:Name="BrowseButton" Content="Sfoglia..." Click="Browse_Click"/>
@@ -53,17 +65,27 @@
           </StackPanel>
           <DockPanel Margin="0,0,0,8" LastChildFill="True">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-              <Button Content="Cerca" Padding="8,3" Click="SearchToggle_Click" ToolTip="Mostra/nascondi ricerca (Ctrl+F)"/>
-              <Button Content="↻" Padding="9,3" Click="RefreshHistory_Click" ToolTip="Aggiorna storico dal disco"/>
+              <Button x:Name="SearchButton" Content="Cerca" Padding="8,3" Click="SearchToggle_Click" ToolTip="Mostra/nascondi ricerca (Ctrl+F)"/>
+              <Button x:Name="RefreshButton" Content="↻" Padding="9,3" Click="RefreshHistory_Click" ToolTip="Aggiorna storico dal disco"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-              <TextBlock Text="CONVERSAZIONI" Foreground="#8DCCD1" FontWeight="SemiBold" FontSize="12"/>
+              <TextBlock x:Name="ConversationHeader" Text="CONVERSAZIONI" Foreground="#8DCCD1" FontWeight="SemiBold" FontSize="12"/>
               <TextBlock x:Name="LiveCount" Text="  0 attive" Foreground="#89A7B1" FontSize="12"/>
             </StackPanel>
           </DockPanel>
           <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
             <Button x:Name="NewSessionButton" Content="+ Nuova conversazione" Click="NewSession_Click"
-                    Background="#5DAEB5" Padding="16,9"/>
+                    Background="#5DAEB5" Padding="10,8"/>
+            <Button x:Name="NewFolderButton" Content="+ Cartella" Click="NewFolder_Click"
+                    Padding="10,8"/>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,9" VerticalAlignment="Center">
+            <TextBlock x:Name="LanguageLabel" Text="Lingua" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <ComboBox x:Name="LanguagePicker" Width="130" Height="26"
+                      SelectionChanged="LanguagePicker_SelectionChanged">
+              <ComboBoxItem Content="English" Tag="en"/>
+              <ComboBoxItem Content="Italiano" Tag="it"/>
+            </ComboBox>
           </StackPanel>
           <TextBox x:Name="ConversationFilter" TextChanged="ConversationFilter_TextChanged"
                    Visibility="Collapsed" ToolTip="Cerca tra sessioni attive e storico"
@@ -72,15 +94,31 @@
         <ListBox x:Name="ConversationsList"
                  SelectionChanged="ConversationsList_SelectionChanged"
                  MouseDoubleClick="ConversationsList_MouseDoubleClick"
+                 ContextMenuOpening="ConversationsList_ContextMenuOpening"
+                 PreviewMouseLeftButtonDown="ConversationsList_PreviewMouseLeftButtonDown"
+                 PreviewMouseMove="ConversationsList_PreviewMouseMove"
+                 DragOver="ConversationsList_DragOver"
+                 Drop="ConversationsList_Drop"
+                 AllowDrop="True"
                  Background="Transparent" BorderThickness="0"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
           <ListBox.ItemTemplate>
             <DataTemplate>
-              <StackPanel>
+              <StackPanel Margin="{Binding Indent}">
                 <TextBlock Text="{Binding Title}" FontWeight="SemiBold"
                            TextWrapping="Wrap" MaxHeight="48"/>
                 <TextBlock Text="{Binding Detail}" Foreground="#B5C9D0"
-                           TextWrapping="Wrap" FontSize="11" Margin="0,4,0,0"/>
+                           TextWrapping="Wrap" FontSize="11" Margin="0,4,0,0">
+                  <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsHeader}" Value="True">
+                          <Setter Property="Visibility" Value="Collapsed"/>
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </TextBlock.Style>
+                </TextBlock>
               </StackPanel>
             </DataTemplate>
           </ListBox.ItemTemplate>
@@ -96,9 +134,9 @@
       <Border Grid.Row="0" Background="#142028" BorderBrush="#31515B" BorderThickness="0,0,0,1">
         <DockPanel Margin="15,0" LastChildFill="True">
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-            <Button Content="Token" Click="Usage_Click" Background="#346A78" ToolTip="Consumi locali Codex"/>
-            <Button Content="Riprendi" Click="ResumeHistory_Click" Background="#305261"/>
-            <Button Content="Chiudi sessione" Click="CloseSession_Click" Background="#313D4D"/>
+            <Button x:Name="TokenButton" Content="Token" Click="Usage_Click" Background="#346A78" ToolTip="Consumi locali Codex"/>
+            <Button x:Name="ResumeButton" Content="Riprendi" Click="ResumeHistory_Click" Background="#305261"/>
+            <Button x:Name="CloseSessionButton" Content="Chiudi sessione" Click="CloseSession_Click" Background="#313D4D"/>
           </StackPanel>
           <TextBlock x:Name="ActiveTitle" Text="Nessuna conversazione"
                      VerticalAlignment="Center" FontWeight="SemiBold" Foreground="#D1F1F4"/>

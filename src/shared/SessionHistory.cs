@@ -117,7 +117,7 @@ public static class SessionHistory
                 metadata.AiTitle, indexed?.Summary, metadata.Summary, metadata.FirstPrompt);
             title = NormalizeTitle(title);
             if (title.Length == 0 || title.StartsWith("<local-command", StringComparison.OrdinalIgnoreCase))
-                title = "Conversazione " + id[..8];
+                title = UiText.T("historyFallback", id[..8]);
             if (title.Length > 90) title = title[..87] + "...";
             found.Add(new HistoryEntry(id, title, actual, File.GetLastWriteTimeUtc(file)));
             if (found.Count >= 250) break;

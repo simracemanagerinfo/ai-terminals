@@ -147,6 +147,91 @@ try
     if (ClaudeTitle(autoId) != "New title after live rename")
         throw new Exception("Claude live title refresh did not invalidate the transcript cache");
 
+    // Each Codex window has its own short completion-marker file.
+    // Read new turns exactly once; multiple completions are allowed.
+    var signalsPath = Path.Combine(home, "codex-turns.signals");
+    int readCount = 0;
+    var seen = new HashSet<string>(StringComparer.Ordinal);
+    if (CodexCompletionSignals.ReadNewTurnIds(signalsPath, ref readCount, seen).Count != 0)
+        throw new Exception("Missing signal file should produce no notifications");
+    File.WriteAllLines(signalsPath, ["turn-1", "turn-1"]);
+    var first = CodexCompletionSignals.ReadNewTurnIds(signalsPath, ref readCount, seen);
+    if (first.Count != 1 || first[0] != "turn-1")
+        throw new Exception("Duplicate completion event was not suppressed");
+    // The CLI's first completed turn exposes its persistent thread ID.
+    var threadId = Guid.NewGuid().ToString("D");
+    if (!CodexCompletionSignals.TryGetThreadId("turn-1|" + threadId, out var parsedThread) ||
+        parsedThread != threadId ||
+        CodexCompletionSignals.TryGetThreadId("turn-1", out _) ||
+        CodexCompletionSignals.TryGetThreadId("turn-1|not-a-guid", out _))
+        throw new Exception("Codex completion thread-id parsing failed.");
+    // A new Codex chat can be assigned to a user folder only once its real
+    // thread identity is known. Do not invent a GUID for Codex.
+    var newCodexThread = Guid.NewGuid().ToString("D");
+    var codexAssignments = SessionOrganization.Open(Path.Combine(home, "codex-new-chat-folders.json"));
+    codexAssignments.Create(project, "Feature work");
+    var targetId = codexAssignments.Folders(project).Single().Id;
+    codexAssignments.Move(project, newCodexThread, targetId);
+    if (SessionOrganization.Open(Path.Combine(home, "codex-new-chat-folders.json"))
+            .FolderOf(project, newCodexThread) != targetId)
+        throw new Exception("Codex assigned thread did not persist in chosen folder.");
+    File.AppendAllLines(signalsPath, ["turn-2", "turn-3"]);
+    var second = CodexCompletionSignals.ReadNewTurnIds(signalsPath, ref readCount, seen);
+    if (second.Count != 2 || second[0] != "turn-2" || second[1] != "turn-3" ||
+        CodexCompletionSignals.ReadNewTurnIds(signalsPath, ref readCount, seen).Count != 0)
+        throw new Exception("Incremental turn completions were lost or replayed");
+
+    // Virtual folders and Bin must survive reopening without touching either
+    // agent's transcript, index or CLI configuration.
+    var organizationPath = Path.Combine(home, "ui-folders.json");
+    var folders = SessionOrganization.Open(organizationPath);
+    var architecture = folders.Create(project, "Architecture");
+    var development = folders.Create(project, "Development");
+    try
+    {
+        folders.Create(project, "Secchio");
+        throw new Exception("Reserved Bin name was accepted as a user folder.");
+    }
+    catch (ArgumentException) { }
+    folders.Move(project, customId, architecture.Id);
+    folders.Move(project, codexId, development.Id);
+    folders.Move(project, customId, SessionOrganization.Bin);
+    if (folders.FolderOf(project, customId) != SessionOrganization.Bin)
+        throw new Exception("Bin placement not saved.");
+    var reopenedFolders = SessionOrganization.Open(organizationPath);
+    if (reopenedFolders.FolderOf(project, customId) != SessionOrganization.Bin ||
+        reopenedFolders.Folders(project).Count != 2)
+        throw new Exception("Bin or folder persistence failed.");
+    reopenedFolders.Restore(project, customId);
+    if (reopenedFolders.FolderOf(project, customId) != architecture.Id)
+        throw new Exception("Restore did not return to the previous folder.");
+    reopenedFolders.Move(project, customId, SessionOrganization.Bin);
+    reopenedFolders.RemoveFolder(project, architecture.Id);
+    reopenedFolders.Restore(project, customId);
+    if (reopenedFolders.FolderOf(project, customId) != SessionOrganization.Unfiled)
+        throw new Exception("Removing a folder did not preserve a safe restore fallback.");
+    var secondProject = Path.Combine(home, "Other Project");
+    Directory.CreateDirectory(secondProject);
+    if (reopenedFolders.Folders(secondProject).Count != 0 ||
+        reopenedFolders.FolderOf(secondProject, codexId) != SessionOrganization.Unfiled)
+        throw new Exception("Project organization leaked into a different project.");
+    if (!File.Exists(ClaudePath(customId)) || !File.Exists(codexPath) ||
+        !File.Exists(indexPath) || !File.Exists(Path.Combine(claudeFolder, "sessions-index.json")))
+        throw new Exception("A virtual folder modified a provider transcript or index.");
+    File.WriteAllText(organizationPath, "{broken-data");
+    try
+    {
+        SessionOrganization.Open(organizationPath);
+        throw new Exception("Corrupt organization metadata was silently overwritten.");
+    }
+    catch (InvalidDataException) { }
+    if (File.ReadAllText(organizationPath) != "{broken-data")
+        throw new Exception("Corrupted organization data was changed.");
+    if (UiText.T("bin") is not ("Bin" or "Secchio") ||
+        UiText.T("moveToBin") is not ("Move to Bin" or "Sposta nel Secchio") ||
+        UiText.T("unknown-code") != "unknown-code")
+        throw new Exception("UI language fallback or Bin translation is invalid.");
+
     Console.WriteLine("[PASS] Claude response dedupe; Codex token snapshots/reset; Claude stored titles, explicit Codex titles and response_item fallback");
 
 }

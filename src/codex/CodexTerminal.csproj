@@ -6,9 +6,9 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>1.0.1</Version>
-    <AssemblyVersion>1.0.1.0</AssemblyVersion>
-    <FileVersion>1.0.1.0</FileVersion>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
     <AssemblyName>CodexTerminal</AssemblyName>
     <RootNamespace>ClaudeTerminal.Host</RootNamespace>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
@@ -32,6 +32,10 @@
     </Content>
     <Content Include="Start-CodexSession.ps1">
       <Link>scripts\Start-CodexSession.ps1</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Notify-CodexTurn.ps1">
+      <Link>scripts\Notify-CodexTurn.ps1</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="assets\codex-terminal.png">
