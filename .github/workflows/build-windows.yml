@@ -6,6 +6,7 @@ on:
       - 'src/**'
       - 'tests/**'
       - 'scripts/**'
+      - 'installer/**'
       - '.github/workflows/build-windows.yml'
   pull_request:
   workflow_dispatch:
@@ -110,6 +111,86 @@ jobs:
           }
           Write-Host '[PASS] Two distinct portable Windows apps with independent brands'
 
+      - name: Build standalone Windows installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $candidates = @(
+            "${env:ProgramFiles(x86)}\\Inno Setup 6\\ISCC.exe",
+            "$env:ProgramFiles\\Inno Setup 6\\ISCC.exe",
+            "${env:ProgramFiles(x86)}\\Inno Setup 7\\ISCC.exe",
+            "$env:ProgramFiles\\Inno Setup 7\\ISCC.exe"
+          )
+          $iscc = $candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+            Select-Object -First 1
+          if (-not $iscc) {
+            choco install innosetup --version=6.7.1 --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' }
+            $iscc = $candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+              Select-Object -First 1
+          }
+          if (-not $iscc) { throw 'ISCC.exe compiler not available' }
+          & $iscc '/Qp' 'installer/AI-Terminals.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed' }
+          $setup = 'out/installer/AI-Terminals-Setup.exe'
+          if (-not (Test-Path -LiteralPath $setup -PathType Leaf)) {
+            throw 'Standalone setup executable missing'
+          }
+          if ((Get-Item -LiteralPath $setup).Length -lt 10MB) {
+            throw 'Installer unusually small'
+          }
+
+      - name: Test unattended per-user installation and data preservation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $appRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomization'
+          New-Item -ItemType Directory -Force -Path $appRoot | Out-Null
+          $metadata = @{
+            'ai-terminals-claude-folders.json' = '{"Version":1,"Projects":{}}'
+            'ai-terminals-codex-folders.json' = '{"Version":1,"Projects":{}}'
+            'ai-terminals-language.json' = '{"Version":1,"Language":"it"}'
+          }
+          foreach ($name in $metadata.Keys) {
+            Set-Content -LiteralPath (Join-Path $appRoot $name) -Value $metadata[$name] -Encoding utf8
+          }
+          $setup = (Resolve-Path -LiteralPath 'out/installer/AI-Terminals-Setup.exe').Path
+          $process = Start-Process -FilePath $setup -ArgumentList @(
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART',
+            '/COMPONENTS=claude,codex'
+          ) -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installer exit code: $($process.ExitCode)" }
+          foreach ($agent in @('Claude','Codex')) {
+            $exe = Join-Path $appRoot "$($agent)Terminal/$($agent)Terminal.exe"
+            if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
+              throw "Installed executable missing: $exe"
+            }
+          }
+          foreach ($name in $metadata.Keys) {
+            $path = Join-Path $appRoot $name
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or
+                (Get-Content -LiteralPath $path -Raw).Trim() -ne $metadata[$name]) {
+              throw "Installer unexpectedly changed local UI metadata: $name"
+            }
+          }
+          Write-Host '[PASS] Both app executables installed; saved folders and language preserved'
+          $uninstaller = Join-Path $appRoot 'unins000.exe'
+          if (-not (Test-Path -LiteralPath $uninstaller -PathType Leaf)) {
+            throw 'Per-user uninstaller missing'
+          }
+          $uninstall = Start-Process -FilePath $uninstaller -ArgumentList @(
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'
+          ) -Wait -PassThru
+          if ($uninstall.ExitCode -ne 0) { throw "Uninstall exit code: $($uninstall.ExitCode)" }
+          foreach ($name in $metadata.Keys) {
+            $path = Join-Path $appRoot $name
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or
+                (Get-Content -LiteralPath $path -Raw).Trim() -ne $metadata[$name]) {
+              throw "Uninstall unexpectedly erased user metadata: $name"
+            }
+          }
+          Write-Host '[PASS] Uninstall leaves saved folders and UI language untouched'
+
       - name: Test two live ConPTY sessions (headless runner advisory)
         id: conpty_smoke
         shell: pwsh
@@ -140,5 +221,12 @@ jobs:
         with:
           name: CodexTerminal-win-x64
           path: out/CodexTerminal/
+          if-no-files-found: error
+          retention-days: 14
+      
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AI-Terminals-Setup
+          path: out/installer/AI-Terminals-Setup.exe
           if-no-files-found: error
           retention-days: 14

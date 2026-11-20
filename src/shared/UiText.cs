@@ -42,6 +42,7 @@ public static class UiText
         ["folderSelect"] = ("Move to folder", "Sposta nella cartella"),
         ["unorganized"] = ("Unorganized", "Non organizzate"),
         ["liveConversations"] = ("Active conversations", "Conversazioni attive"),
+        ["otherProjectActive"] = ("Other projects · active", "Altri progetti · attive"),
         ["otherProject"] = ("Other project", "Altro progetto"),
         ["bin"] = ("Bin", "Secchio"),
         ["binHint"] = ("Conversations are hidden, not deleted from disk.", "Le conversazioni sono nascoste, non cancellate dal disco."),

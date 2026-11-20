@@ -11,7 +11,7 @@ I progetti in `src/claude/` e `src/codex/` compilano lo stesso codice `src/share
 
 ## Versione stabile
 
-**Release stabile attuale: v1.1.0** (prima versione: v1.0.0). Due EXE Windows indipendenti, con identità grafica, cache, processi e cronologia separati. Il progetto `powershell-personalizzation` non viene modificato; qui non vengono aggiunti alias o profili globali.
+**Release stabile attuale: v1.1.1** (prima versione: v1.0.0). Due EXE Windows indipendenti, con identità grafica, cache, processi e cronologia separati. Il progetto `powershell-personalizzation` non viene modificato; qui non vengono aggiunti alias o profili globali.
 
 ## Build Windows
 
@@ -28,6 +28,18 @@ Pop-Location
 dotnet publish src/claude/ClaudeTerminal.csproj -c Release -r win-x64 --self-contained true -o out/ClaudeTerminal
 dotnet publish src/codex/CodexTerminal.csproj -c Release -r win-x64 --self-contained true -o out/CodexTerminal
 ```
+
+## Installazione consigliata: un solo EXE
+
+Scarica [**AI-Terminals-Setup.exe** dalla release ufficiale](https://github.com/simracemanagerinfo/ai-terminals/releases/latest) e avvialo con doppio clic. L'installazione è **offline**, per utente e **senza privilegi amministrativi**. Puoi scegliere Claude Terminal, Codex Terminal o entrambi; vengono creati collegamenti nel menu Start, più eventuali collegamenti desktop su richiesta.
+
+Le cartelle delle installazioni esistenti vengono riutilizzate; cronologia, preferenze e cartelle virtuali rimangono disponibili. Non devi eseguire manualmente script PowerShell, accedere a GitHub o estrarre archivi ZIP.
+
+**Requisiti runtime:** Windows x64, PowerShell 7, Microsoft WebView2 Runtime e la CLI Claude Code e/o Codex installata separatamente e presente nel PATH. L'installer non installa automaticamente le CLI degli agenti.
+
+**Avviso sicurezza:** l'installer non dispone ancora di firma digitale, quindi Windows SmartScreen potrebbe mostrare una segnalazione o una policy aziendale potrebbe impedirne l'avvio. Non occorre né è consigliabile disabilitare antivirus e protezioni Windows.
+
+Gli ZIP portabili e il vecchio installatore PowerShell rimangono disponibili come alternative.
 
 ## Installazione o aggiornamento da GitHub
 
@@ -88,7 +100,7 @@ L'icona Codex in questa fase è un marchio grafico personalizzato grafite/teal, 
 - Le cartelle sono **virtuali per progetto** e vengono salvate in `%LOCALAPPDATA%\PowerShellCustomization\ai-terminals-claude-folders.json` oppure `ai-terminals-codex-folders.json`, mai nella cartella di codice del progetto.
 - Per creare una cartella usa `+ Cartella`; clicca una cartella per espandere/ridurre. Con il tasto destro su una cartella puoi rinominarla o rimuoverla (le chat tornano fra quelle non organizzate).
 - Con il tasto destro su una chat dello storico puoi spostarla in una cartella, nel Secchio o ripristinarla.
-- Puoi anche trascinare una conversazione dello storico sopra una cartella (drag & drop). Dal tasto destro sulla cartella scegli **Nuova conversazione qui** per avviarla direttamente in quella categoria. Per Claude il collegamento è immediato; per Codex viene assegnato al completamento della prima risposta, quando si conosce il vero ID della sessione. Le sessioni in esecuzione rimangono nella sezione dedicata; chiudile prima di organizzarle.
+- Puoi anche trascinare una conversazione dello storico sopra una cartella (drag & drop). Dal tasto destro sulla cartella scegli **Nuova conversazione qui** per avviarla direttamente in quella categoria. Per Claude il collegamento è immediato; per Codex viene assegnato al completamento della prima risposta, quando si conosce il vero ID della sessione. **Le conversazioni attive restano nella cartella scelta**, con indicazione dello stato, e mantengono la loro organizzazione anche quando vengono chiuse. Puoi spostarle mentre sono aperte con clic destro o trascinamento. Le sessioni di altri progetti restano raggiungibili in una sezione separata.
 - **Lingua**: selettore in alto a sinistra, English/Italiano; inizialmente segue la lingua di Windows, inglese come fallback. La preferenza è condivisa tra i due terminali e sopravvive al riavvio.
 - Nessun archivio o transcript viene eliminato fisicamente.
 - Funzioni incluse in v1.1.0, con codice condiviso e installazione negli stessi due percorsi.

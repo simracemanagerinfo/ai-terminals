@@ -31,7 +31,7 @@ public partial class MainWindow : Window
     private string? _organizationLoadError;
     private bool _applyingLanguage;
     private System.Windows.Point _dragStart;
-    private HistoryEntry? _draggingHistory;
+    private SidebarRow? _draggingRow;
     private readonly ConcurrentQueue<(string Id, string Text)> _output = new();
     private readonly DispatcherTimer _flushTimer = new() { Interval = TimeSpan.FromMilliseconds(30) };
     private readonly DispatcherTimer _titleRefreshTimer = new() { Interval = TimeSpan.FromSeconds(15) };
@@ -564,6 +564,10 @@ public partial class MainWindow : Window
     private string SectionKey(string folderId)
         => "section:" + _project + ":" + folderId;
 
+    private string EffectiveFolder(LiveItem item) =>
+        LiveFolderRouting.EffectiveFolder(
+            _organization, item.ProjectPath, item.ClaudeSessionId, item.PendingFolderId);
+
     private void UpdateSidebar(string? preferredTerminalId = null)
     {
         var previousKey = (ConversationsList.SelectedItem as SidebarRow)?.Key;
@@ -571,6 +575,14 @@ public partial class MainWindow : Window
             ? previousKey : "live:" + preferredTerminalId;
         var search = ConversationFilter.Text?.Trim() ?? "";
         var rows = new List<SidebarRow>();
+
+        bool MatchesLive(LiveItem active)
+        {
+            var detail = active.Provider + " " + active.Status + " " + active.ProjectPath;
+            return search.Length == 0 ||
+                active.Label.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                detail.Contains(search, StringComparison.OrdinalIgnoreCase);
+        }
 
         void AddHeader(string key, string name, int count, string? folderId = null)
         {
@@ -581,51 +593,72 @@ public partial class MainWindow : Window
                 IsHeader: true, FolderId: folderId));
         }
 
-        // Running processes remain accessible, even if their project differs
-        // from the selected project. Only completed/history rows are filed.
-        var visibleLive = _live.Where(active =>
+        void AddLiveRow(LiveItem active)
         {
-            var detail = active.Provider + " " + active.Status + " " + active.ProjectPath;
-            return search.Length == 0 ||
-                active.Label.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                detail.Contains(search, StringComparison.OrdinalIgnoreCase);
-        }).ToArray();
-        if (visibleLive.Length > 0)
+            var title = active.Unread ? "● " + active.Label : active.Label;
+            var detail = active.Provider + " · " + DisplayStatus(active.Status) +
+                         " · " + Path.GetFileName(active.ProjectPath) +
+                         (active.Unread ? " · " + UiText.T("responseReady") : "");
+            rows.Add(new SidebarRow("live:" + active.Id, title, detail, active, null,
+                IsUnread: active.Unread, Indent: new Thickness(15, 0, 0, 0)));
+        }
+
+        // When switching projects, keep processes from other projects reachable
+        // in a small separate section. Active chats from the selected project
+        // always appear in their real virtual folders instead.
+        var otherProjectLive = _live.Where(active =>
+            (_project is null ||
+             !active.ProjectPath.Equals(_project, StringComparison.OrdinalIgnoreCase)) &&
+            MatchesLive(active)).ToArray();
+        if (otherProjectLive.Length > 0)
         {
             const string activeSection = "section:active";
-            AddHeader(activeSection, UiText.T("liveConversations"), visibleLive.Length);
+            AddHeader(activeSection, UiText.T("otherProjectActive"), otherProjectLive.Length);
             if (!_collapsedFolders.Contains(activeSection))
-                foreach (var active in visibleLive)
-                {
-                    var title = active.Unread ? "● " + active.Label : active.Label;
-                    var detail = active.Provider + " · " + DisplayStatus(active.Status) +
-                                 " · " + Path.GetFileName(active.ProjectPath) +
-                                 (active.Unread ? " · " + UiText.T("responseReady") : "");
-                    rows.Add(new SidebarRow("live:" + active.Id, title, detail, active, null,
-                        IsUnread: active.Unread, Indent: new Thickness(15, 0, 0, 0)));
-                }
+                foreach (var active in otherProjectLive)
+                    AddLiveRow(active);
         }
 
         var resumedIds = _live.Where(x => x.ClaudeSessionId is not null)
             .Select(x => x.Provider + ":" + x.ClaudeSessionId)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var history = _history.Where(h => !resumedIds.Contains(h.Provider + ":" + h.Id)).ToArray();
+        var history = _history.Where(h => !resumedIds.Contains(h.Provider + ":" + h.Id))
+            .ToArray();
+
         if (_project is not null)
         {
+            if (preferredTerminalId is not null &&
+                _live.FirstOrDefault(x => x.Id == preferredTerminalId) is { } target &&
+                target.ProjectPath.Equals(_project, StringComparison.OrdinalIgnoreCase))
+            {
+                var folderId = EffectiveFolder(target);
+                var key = folderId.Length == 0 ? "__unfiled__" : folderId;
+                _collapsedFolders.Remove(SectionKey(key));
+            }
+
+            var currentProjectLive = _live.Where(active =>
+                active.ProjectPath.Equals(_project, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+
             void AddFolder(string folderId, string title)
             {
-                var entries = history.Where(h =>
-                    (_organization?.FolderOf(_project, h.Id) ?? SessionOrganization.Unfiled)
-                        == folderId).ToArray();
-                // Always show folder headers (including the Bin at the end).
-                var matching = entries.Where(h =>
+                var assignedLive = currentProjectLive.Where(active =>
+                    EffectiveFolder(active) == folderId).ToArray();
+                var assignedHistory = history.Where(h =>
+                    (_organization?.FolderOf(_project, h.Id) ??
+                     SessionOrganization.Unfiled) == folderId).ToArray();
+
+                var key = folderId.Length == 0 ? "__unfiled__" : folderId;
+                var section = SectionKey(key);
+                AddHeader(section, title, assignedLive.Length + assignedHistory.Length, folderId);
+                if (_collapsedFolders.Contains(section)) return;
+
+                foreach (var active in assignedLive.Where(MatchesLive))
+                    AddLiveRow(active);
+                foreach (var historical in assignedHistory.Where(h =>
                     search.Length == 0 ||
                     h.Title.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                    h.Id.Contains(search, StringComparison.OrdinalIgnoreCase)).ToArray();
-                var section = SectionKey(folderId.Length == 0 ? "__unfiled__" : folderId);
-                AddHeader(section, title, entries.Length, folderId);
-                if (_collapsedFolders.Contains(section)) return;
-                foreach (var historical in matching)
+                    h.Id.Contains(search, StringComparison.OrdinalIgnoreCase)))
                     rows.Add(new SidebarRow(
                         "history:" + historical.Provider + ":" + historical.Id,
                         historical.Title,
@@ -640,7 +673,7 @@ public partial class MainWindow : Window
                     AddFolder(folder.Id, folder.Name);
             AddFolder(SessionOrganization.Unfiled, UiText.T("unorganized"));
 
-            // The Bin is always the very last section.
+            // The Bin always stays last, below all active and stored chats.
             var binSection = SectionKey(SessionOrganization.Bin);
             if (_knownBinSections.Add(binSection))
                 _collapsedFolders.Add(binSection);
@@ -814,7 +847,16 @@ public partial class MainWindow : Window
         if (MessageBox.Show(this, UiText.T("folderDeletePrompt", folder.Name),
                 UiText.T("folderDelete"), MessageBoxButton.YesNo, MessageBoxImage.Question)
             != MessageBoxResult.Yes) return;
-        EditFolders(() => _organization.RemoveFolder(_project, id));
+        EditFolders(() =>
+        {
+            _organization.RemoveFolder(_project, id);
+            // Codex can still be waiting for its first completion/thread ID.
+            // A pending placement must not point to a deleted virtual folder.
+            foreach (var active in _live.Where(x =>
+                x.ProjectPath.Equals(_project, StringComparison.OrdinalIgnoreCase) &&
+                x.PendingFolderId == id))
+                active.PendingFolderId = SessionOrganization.Unfiled;
+        });
     }
 
     private void MoveHistory(HistoryEntry session, string target)
@@ -831,32 +873,73 @@ public partial class MainWindow : Window
         });
     }
 
+    private void MoveLive(LiveItem session, string target)
+    {
+        if (_project is null || _organization is null ||
+            !session.ProjectPath.Equals(_project, StringComparison.OrdinalIgnoreCase) ||
+            session.CompletionSignalPath is null) return;
+        // Running chats must not disappear into the collapsed Bin. Close the
+        // process first, then use the history menu to archive it.
+        if (target == SessionOrganization.Bin)
+        {
+            FooterStatus.Text = UiText.T("activeMoveDenied");
+            return;
+        }
+        if (target != SessionOrganization.Unfiled &&
+            !_organization.Folders(_project).Any(x => x.Id == target))
+        {
+            ShowError(UiText.T("folderNotFound"));
+            return;
+        }
+        if (session.ClaudeSessionId is { } stableId)
+        {
+            EditFolders(() =>
+            {
+                _organization.Move(session.ProjectPath, stableId, target);
+                session.PendingFolderId = null;
+            });
+        }
+        else
+        {
+            // Codex first needs to report its own stable thread ID. Keep the
+            // selected folder in memory until the session-scoped hook fires.
+            session.PendingFolderId = target;
+        }
+        _collapsedFolders.Remove(SectionKey(target.Length == 0 ? "__unfiled__" : target));
+        UpdateSidebar(preferredTerminalId: session.Id);
+    }
+
     private bool InBin(HistoryEntry session) =>
         _project is not null && _organization?.FolderOf(_project, session.Id)
             == SessionOrganization.Bin;
 
-    // Dragging is available only for inactive history conversations. We do not
-    // accept external drag payloads: the actual session is held in-memory.
+    // Only conversations from the selected project can be moved. The drag
+    // payload is local to this ListBox; no external file paths are accepted.
     private void ConversationsList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        _draggingHistory = null;
-        var element = e.OriginalSource as DependencyObject;
-        var item = element is null ? null :
-            ItemsControl.ContainerFromElement(ConversationsList, element) as ListBoxItem;
-        if (item?.DataContext is SidebarRow { History: { } history } &&
+        _draggingRow = null;
+        var source = e.OriginalSource as DependencyObject;
+        var container = source is null ? null :
+            ItemsControl.ContainerFromElement(ConversationsList, source) as ListBoxItem;
+        if (container?.DataContext is not SidebarRow row) return;
+        if (row.History is { } history &&
             history.Directory.Equals(_project, StringComparison.OrdinalIgnoreCase))
-        {
+            _draggingRow = row;
+        else if (row.Live is { CompletionSignalPath: not null } live &&
+                 live.ProjectPath.Equals(_project, StringComparison.OrdinalIgnoreCase))
+            _draggingRow = row;
+
+        if (_draggingRow is not null)
             _dragStart = e.GetPosition(ConversationsList);
-            _draggingHistory = history;
-        }
     }
 
-    private void ConversationsList_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    private void ConversationsList_PreviewMouseMove(
+        object sender, System.Windows.Input.MouseEventArgs e)
     {
-        if (_draggingHistory is null) return;
+        if (_draggingRow is null) return;
         if (e.LeftButton != MouseButtonState.Pressed)
         {
-            _draggingHistory = null;
+            _draggingRow = null;
             return;
         }
         var position = e.GetPosition(ConversationsList);
@@ -868,10 +951,10 @@ public partial class MainWindow : Window
         {
             System.Windows.DragDrop.DoDragDrop(
                 ConversationsList,
-                new System.Windows.DataObject("AITerminalsLocalSession", _draggingHistory.Id),
+                new System.Windows.DataObject("AITerminalsLocalSession", _draggingRow.Key),
                 System.Windows.DragDropEffects.Move);
         }
-        finally { _draggingHistory = null; }
+        finally { _draggingRow = null; }
     }
 
     private string? DropDestination(object originalSource)
@@ -885,31 +968,33 @@ public partial class MainWindow : Window
 
     private void ConversationsList_DragOver(object sender, System.Windows.DragEventArgs e)
     {
-        if (_draggingHistory is not null &&
+        var destination = DropDestination(e.OriginalSource);
+        var row = _draggingRow;
+        var valid = row is not null && destination is not null &&
             e.Data.GetDataPresent("AITerminalsLocalSession") &&
-            DropDestination(e.OriginalSource) is not null)
-            e.Effects = System.Windows.DragDropEffects.Move;
-        else
-            e.Effects = System.Windows.DragDropEffects.None;
+            (row.History is not null ||
+             (row.Live is not null && destination != SessionOrganization.Bin));
+        e.Effects = valid ? System.Windows.DragDropEffects.Move :
+            System.Windows.DragDropEffects.None;
         e.Handled = true;
     }
 
     private void ConversationsList_Drop(object sender, System.Windows.DragEventArgs e)
     {
-        var conversation = _draggingHistory;
+        var row = _draggingRow;
         var destination = DropDestination(e.OriginalSource);
-        if (conversation is not null && destination is not null &&
+        var valid = row is not null && destination is not null &&
             e.Data.GetDataPresent("AITerminalsLocalSession") &&
-            _project is not null &&
-            conversation.Directory.Equals(_project, StringComparison.OrdinalIgnoreCase))
-        {
-            MoveHistory(conversation, destination);
-            e.Effects = System.Windows.DragDropEffects.Move;
-        }
-        else
-            e.Effects = System.Windows.DragDropEffects.None;
+            (row.History is not null ||
+             (row.Live is not null && destination != SessionOrganization.Bin));
+        if (valid && row!.History is { } historical)
+            MoveHistory(historical, destination!);
+        else if (valid && row!.Live is { } active)
+            MoveLive(active, destination!);
+        e.Effects = valid ? System.Windows.DragDropEffects.Move :
+            System.Windows.DragDropEffects.None;
         e.Handled = true;
-        _draggingHistory = null;
+        _draggingRow = null;
     }
 
     private void ConversationsList_ContextMenuOpening(object sender, ContextMenuEventArgs e)
@@ -965,6 +1050,21 @@ public partial class MainWindow : Window
                 menu.Items.Add(Item(UiText.T("moveToBin"),
                     () => MoveHistory(conversation, SessionOrganization.Bin)));
             }
+        }
+
+        else if (row.Live is { CompletionSignalPath: not null } active &&
+                 active.ProjectPath.Equals(_project, StringComparison.OrdinalIgnoreCase))
+        {
+            var submenu = new MenuItem { Header = UiText.T("folderSelect") };
+            submenu.Items.Add(Item(UiText.T("unorganized"),
+                () => MoveLive(active, SessionOrganization.Unfiled)));
+            foreach (var folder in _organization.Folders(_project))
+            {
+                var targetFolder = folder.Id;
+                submenu.Items.Add(Item(folder.Name,
+                    () => MoveLive(active, targetFolder)));
+            }
+            menu.Items.Add(submenu);
         }
 
         if (menu.Items.Count == 0) { e.Handled = true; return; }
@@ -1063,7 +1163,7 @@ public partial class MainWindow : Window
             MarkRead(active);
         }
     }
-    private void CloseSession_Click(object sender, RoutedEventArgs e)
+    private async void CloseSession_Click(object sender, RoutedEventArgs e)
     {
         if (ConversationsList.SelectedItem is not SidebarRow { Live: { } item }) return;
         if (item.Status != "Terminata")
@@ -1084,6 +1184,9 @@ public partial class MainWindow : Window
             _visibleTerminalId = null;
             ActiveTitle.Text = UiText.T("noConversation");
         }
+        // Refresh immediately so a closed running chat appears in its same
+        // persisted folder, without a 15-second detour to Unorganized.
+        await RefreshHistoryAsync(silent: true);
     }
 
     private void MainWindow_Closing(object? sender, CancelEventArgs e)
