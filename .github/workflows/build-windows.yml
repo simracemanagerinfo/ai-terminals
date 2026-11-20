@@ -6,6 +6,7 @@ on:
       - 'src/**'
       - 'tests/**'
       - 'scripts/**'
+      - 'installer/**'
       - '.github/workflows/build-windows.yml'
   pull_request:
   workflow_dispatch:
@@ -110,6 +111,60 @@ jobs:
           }
           Write-Host '[PASS] Two distinct portable Windows apps with independent brands'
 
+      - name: Build standalone Windows installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $candidates = @(
+            "${env:ProgramFiles(x86)}\\Inno Setup 6\\ISCC.exe",
+            "$env:ProgramFiles\\Inno Setup 6\\ISCC.exe",
+            "${env:ProgramFiles(x86)}\\Inno Setup 7\\ISCC.exe",
+            "$env:ProgramFiles\\Inno Setup 7\\ISCC.exe"
+          )
+          $iscc = $candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+            Select-Object -First 1
+          if (-not $iscc) {
+            choco install innosetup --version=6.7.1 --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' }
+            $iscc = $candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+              Select-Object -First 1
+          }
+          if (-not $iscc) { throw 'ISCC.exe compiler not available' }
+          & $iscc '/Qp' 'installer/AI-Terminals.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed' }
+          $setup = 'out/installer/AI-Terminals-Setup.exe'
+          if (-not (Test-Path -LiteralPath $setup -PathType Leaf)) {
+            throw 'Standalone setup executable missing'
+          }
+          if ((Get-Item -LiteralPath $setup).Length -lt 10MB) {
+            throw 'Installer unusually small'
+          }
+
+      - name: Test unattended per-user installation and data preservation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $appRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomization'
+          New-Item -ItemType Directory -Force -Path $appRoot | Out-Null
+          $sentinel = Join-Path $appRoot 'ai-terminals-test-preserve.json'
+          Set-Content -LiteralPath $sentinel -Value '{"keep":true}' -Encoding utf8
+          $setup = (Resolve-Path -LiteralPath 'out/installer/AI-Terminals-Setup.exe').Path
+          $process = Start-Process -FilePath $setup -ArgumentList @(
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART',
+            '/COMPONENTS=claude,codex'
+          ) -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installer exit code: $($process.ExitCode)" }
+          foreach ($agent in @('Claude','Codex')) {
+            $exe = Join-Path $appRoot "$($agent)Terminal/$($agent)Terminal.exe"
+            if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
+              throw "Installed executable missing: $exe"
+            }
+          }
+          if (-not (Test-Path -LiteralPath $sentinel -PathType Leaf)) {
+            throw 'Installer unexpectedly deleted local user metadata'
+          }
+          Write-Host '[PASS] Both app executables installed, user metadata preserved'
+
       - name: Test two live ConPTY sessions (headless runner advisory)
         id: conpty_smoke
         shell: pwsh
@@ -140,5 +195,12 @@ jobs:
         with:
           name: CodexTerminal-win-x64
           path: out/CodexTerminal/
+          if-no-files-found: error
+          retention-days: 14
+      
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AI-Terminals-Setup
+          path: out/installer/AI-Terminals-Setup.exe
           if-no-files-found: error
           retention-days: 14
