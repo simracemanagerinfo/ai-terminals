@@ -146,8 +146,14 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $appRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomization'
           New-Item -ItemType Directory -Force -Path $appRoot | Out-Null
-          $sentinel = Join-Path $appRoot 'ai-terminals-test-preserve.json'
-          Set-Content -LiteralPath $sentinel -Value '{"keep":true}' -Encoding utf8
+          $metadata = @{
+            'ai-terminals-claude-folders.json' = '{"Version":1,"Projects":{}}'
+            'ai-terminals-codex-folders.json' = '{"Version":1,"Projects":{}}'
+            'ai-terminals-language.json' = '{"Version":1,"Language":"it"}'
+          }
+          foreach ($name in $metadata.Keys) {
+            Set-Content -LiteralPath (Join-Path $appRoot $name) -Value $metadata[$name] -Encoding utf8
+          }
           $setup = (Resolve-Path -LiteralPath 'out/installer/AI-Terminals-Setup.exe').Path
           $process = Start-Process -FilePath $setup -ArgumentList @(
             '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART',
@@ -160,10 +166,30 @@ jobs:
               throw "Installed executable missing: $exe"
             }
           }
-          if (-not (Test-Path -LiteralPath $sentinel -PathType Leaf)) {
-            throw 'Installer unexpectedly deleted local user metadata'
+          foreach ($name in $metadata.Keys) {
+            $path = Join-Path $appRoot $name
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or
+                (Get-Content -LiteralPath $path -Raw).Trim() -ne $metadata[$name]) {
+              throw "Installer unexpectedly changed local UI metadata: $name"
+            }
           }
-          Write-Host '[PASS] Both app executables installed, user metadata preserved'
+          Write-Host '[PASS] Both app executables installed; saved folders and language preserved'
+          $uninstaller = Join-Path $appRoot 'unins000.exe'
+          if (-not (Test-Path -LiteralPath $uninstaller -PathType Leaf)) {
+            throw 'Per-user uninstaller missing'
+          }
+          $uninstall = Start-Process -FilePath $uninstaller -ArgumentList @(
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'
+          ) -Wait -PassThru
+          if ($uninstall.ExitCode -ne 0) { throw "Uninstall exit code: $($uninstall.ExitCode)" }
+          foreach ($name in $metadata.Keys) {
+            $path = Join-Path $appRoot $name
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or
+                (Get-Content -LiteralPath $path -Raw).Trim() -ne $metadata[$name]) {
+              throw "Uninstall unexpectedly erased user metadata: $name"
+            }
+          }
+          Write-Host '[PASS] Uninstall leaves saved folders and UI language untouched'
 
       - name: Test two live ConPTY sessions (headless runner advisory)
         id: conpty_smoke
