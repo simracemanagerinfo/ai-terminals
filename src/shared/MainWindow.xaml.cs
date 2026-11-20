@@ -1052,6 +1052,21 @@ public partial class MainWindow : Window
             }
         }
 
+        else if (row.Live is { CompletionSignalPath: not null } active &&
+                 active.ProjectPath.Equals(_project, StringComparison.OrdinalIgnoreCase))
+        {
+            var submenu = new MenuItem { Header = UiText.T("folderSelect") };
+            submenu.Items.Add(Item(UiText.T("unorganized"),
+                () => MoveLive(active, SessionOrganization.Unfiled)));
+            foreach (var folder in _organization.Folders(_project))
+            {
+                var targetFolder = folder.Id;
+                submenu.Items.Add(Item(folder.Name,
+                    () => MoveLive(active, targetFolder)));
+            }
+            menu.Items.Add(submenu);
+        }
+
         if (menu.Items.Count == 0) { e.Handled = true; return; }
         ConversationsList.ContextMenu = menu;
     }
@@ -1148,7 +1163,7 @@ public partial class MainWindow : Window
             MarkRead(active);
         }
     }
-    private void CloseSession_Click(object sender, RoutedEventArgs e)
+    private async void CloseSession_Click(object sender, RoutedEventArgs e)
     {
         if (ConversationsList.SelectedItem is not SidebarRow { Live: { } item }) return;
         if (item.Status != "Terminata")
@@ -1169,6 +1184,9 @@ public partial class MainWindow : Window
             _visibleTerminalId = null;
             ActiveTitle.Text = UiText.T("noConversation");
         }
+        // Refresh immediately so a closed running chat appears in its same
+        // persisted folder, without a 15-second detour to Unorganized.
+        await RefreshHistoryAsync(silent: true);
     }
 
     private void MainWindow_Closing(object? sender, CancelEventArgs e)
