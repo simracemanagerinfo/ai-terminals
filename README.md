@@ -13,9 +13,13 @@ Each executable has its own terminal sessions, local folders, UI cache and icon.
 
 ## Installation and updates
 
-**Latest stable release: v1.1.0.** Includes completion notifications, virtual folders, the Bin, drag/drop and bilingual UI.
+**Latest stable release: v1.1.1.** The easiest way to install or update is to [download **AI-Terminals-Setup.exe**](https://github.com/simracemanagerinfo/ai-terminals/releases/latest) and double-click it.
 
-PowerShell 7 (run from **any directory**, with the terminal windows closed):
+The offline Windows setup lets you choose **Claude Terminal**, **Codex Terminal**, or both. It uses the existing per-user application locations, adds Start menu shortcuts, and can create optional desktop shortcuts. **No PowerShell installer script, GitHub login, or administrator privileges required.** Existing virtual folders, saved conversations and UI language settings are kept.
+
+Windows SmartScreen may warn because this new public installer is currently **unsigned**. Do not disable antivirus or SmartScreen. Corporate application control may block executables depending on local policies.
+
+The existing portable ZIP archives remain available in the same release. Advanced users can also continue to update both apps with the PowerShell installer:
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -24,14 +28,13 @@ Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/simracemanagerinfo/ai-
 & $installer -App Both
 ```
 
-The installer downloads stable public GitHub Release assets **without a GitHub login**, uses your existing GitHub authentication only for Actions previews, and replaces the two fixed app directories without creating aliases. Use `-App Claude` or `-App Codex` to update just one app. An explicit `-RunId` downloads both packages from that **successful Windows Actions run** instead of the stable release.
-
-Permanent locations:
+Installed programs:
 
 - `%LOCALAPPDATA%\PowerShellCustomization\ClaudeTerminal\ClaudeTerminal.exe`
 - `%LOCALAPPDATA%\PowerShellCustomization\CodexTerminal\CodexTerminal.exe`
 
-The apps require their respective CLI installed and available in `PATH`, PowerShell 7, and WebView2 Runtime. No administrator rights are required by the portable apps themselves.
+**Runtime requirements:** Windows x64, WebView2 Runtime, PowerShell 7, and the corresponding Claude Code or Codex CLI installed independently in `PATH`. The standalone installer only installs our two terminal frontends; it does not silently install the CLI providers. The downloadable setup does not need .NET SDK or Node.js.
+
 
 ## Features in v1.1.0
 
