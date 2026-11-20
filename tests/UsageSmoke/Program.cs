@@ -181,6 +181,46 @@ try
         CodexCompletionSignals.ReadNewTurnIds(signalsPath, ref readCount, seen).Count != 0)
         throw new Exception("Incremental turn completions were lost or replayed");
 
+    // Live conversations must stay in their selected project folder both
+    // before and after receiving their real stable session ID.
+    var routingFile = Path.Combine(home, "live-folders.json");
+    var routing = SessionOrganization.Open(routingFile);
+    var workFolder = routing.Create(project, "Work in progress");
+    var otherFolder = routing.Create(project, "Reviews");
+    var claudeActiveId = Guid.NewGuid().ToString("D");
+    var codexActiveId = Guid.NewGuid().ToString("D");
+    if (LiveFolderRouting.EffectiveFolder(
+            routing, project, null, workFolder.Id) != workFolder.Id)
+        throw new Exception("Pending Codex session was not displayed in its folder.");
+    if (LiveFolderRouting.EffectiveFolder(
+            routing, project, null, null) != SessionOrganization.Unfiled)
+        throw new Exception("Unassigned live chat should appear in Unorganized.");
+    routing.Move(project, claudeActiveId, workFolder.Id);
+    if (LiveFolderRouting.EffectiveFolder(
+            routing, project, claudeActiveId, null) != workFolder.Id)
+        throw new Exception("Claude live session lost its persisted folder.");
+    routing.Move(project, codexActiveId, otherFolder.Id);
+    var routingReopened = SessionOrganization.Open(routingFile);
+    if (LiveFolderRouting.EffectiveFolder(
+            routingReopened, project, codexActiveId, null) != otherFolder.Id)
+        throw new Exception("Codex live folder did not survive persistence/reopen.");
+    if (LiveFolderRouting.EffectiveFolder(
+            routingReopened, project, claudeActiveId, otherFolder.Id) != otherFolder.Id)
+        throw new Exception("Pending move must take precedence while completing.");
+    routingReopened.RemoveFolder(project, workFolder.Id);
+    if (LiveFolderRouting.EffectiveFolder(
+            routingReopened, project, claudeActiveId, null) != SessionOrganization.Unfiled)
+        throw new Exception("Removing a folder stranded a running conversation.");
+    routingReopened.Move(project, codexActiveId, SessionOrganization.Bin);
+    if (LiveFolderRouting.EffectiveFolder(
+            routingReopened, project, codexActiveId, null) != SessionOrganization.Unfiled)
+        throw new Exception("An active session should stay accessible outside the Bin.");
+    var secondLiveProject = Path.Combine(home, "Separate Live Project");
+    Directory.CreateDirectory(secondLiveProject);
+    if (LiveFolderRouting.EffectiveFolder(
+            routingReopened, secondLiveProject, codexActiveId, null) != SessionOrganization.Unfiled)
+        throw new Exception("Live conversation folders must be isolated per project.");
+
     // Virtual folders and Bin must survive reopening without touching either
     // agent's transcript, index or CLI configuration.
     var organizationPath = Path.Combine(home, "ui-folders.json");
