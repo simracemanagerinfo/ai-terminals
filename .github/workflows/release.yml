@@ -1,4 +1,4 @@
-name: Publish AI Terminals v1.1.0
+name: Publish AI Terminals v1.1.1
 
 on:
   workflow_run:
@@ -43,13 +43,21 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: packages/CodexTerminal
 
+      - name: Download installer from same successful Windows build
+        uses: actions/download-artifact@v4
+        with:
+          name: AI-Terminals-Setup
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: packages/Installer
+
       - name: Verify checked-out release versions
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           foreach ($project in @('src/claude/ClaudeTerminal.csproj', 'src/codex/CodexTerminal.csproj')) {
             [xml]$xml = Get-Content -LiteralPath $project -Raw
-            if ($xml.Project.PropertyGroup.Version -ne '1.1.0') {
+            if ($xml.Project.PropertyGroup.Version -ne '1.1.1') {
               throw "Unexpected version for ${project}: $($xml.Project.PropertyGroup.Version)"
             }
           }
@@ -85,16 +93,27 @@ jobs:
             $checksums += "$digest  $([IO.Path]::GetFileName($archive))"
             Write-Host "[OK] $archive SHA256 $digest"
           }
+          $setup = 'packages/Installer/AI-Terminals-Setup.exe'
+          if (-not (Test-Path -LiteralPath $setup -PathType Leaf)) {
+            throw 'Missing tested Windows installer artifact'
+          }
+          if ((Get-Item -LiteralPath $setup).Length -lt 10MB) {
+            throw 'Windows installer unexpectedly small'
+          }
+          $dest = 'release-assets/AI-Terminals-Setup.exe'
+          Copy-Item -LiteralPath $setup -Destination $dest
+          $digest = (Get-FileHash -LiteralPath $dest -Algorithm SHA256).Hash.ToLowerInvariant()
+          $checksums += "$digest  AI-Terminals-Setup.exe"
           $checksums | Set-Content -LiteralPath 'release-assets/SHA256SUMS.txt' -Encoding ascii
 
-      - name: Publish stable GitHub Release v1.1.0
+      - name: Publish stable GitHub Release v1.1.1
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           $ErrorActionPreference = 'Stop'
-          gh release create v1.1.0 'release-assets/ClaudeTerminal-win-x64.zip' 'release-assets/CodexTerminal-win-x64.zip' 'release-assets/SHA256SUMS.txt' --repo $env:GITHUB_REPOSITORY --target $env:TESTED_SHA --title 'AI Terminals v1.1.0' --notes-file 'docs/releases/v1.1.0.md' --latest
+          gh release create v1.1.1 'release-assets/AI-Terminals-Setup.exe' 'release-assets/ClaudeTerminal-win-x64.zip' 'release-assets/CodexTerminal-win-x64.zip' 'release-assets/SHA256SUMS.txt' --repo $env:GITHUB_REPOSITORY --target $env:TESTED_SHA --title 'AI Terminals v1.1.1' --notes-file 'docs/releases/v1.1.1.md' --latest
           if ($LASTEXITCODE -ne 0) {
             throw "GitHub release publication failed ($LASTEXITCODE)"
           }
