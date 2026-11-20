@@ -847,7 +847,16 @@ public partial class MainWindow : Window
         if (MessageBox.Show(this, UiText.T("folderDeletePrompt", folder.Name),
                 UiText.T("folderDelete"), MessageBoxButton.YesNo, MessageBoxImage.Question)
             != MessageBoxResult.Yes) return;
-        EditFolders(() => _organization.RemoveFolder(_project, id));
+        EditFolders(() =>
+        {
+            _organization.RemoveFolder(_project, id);
+            // Codex can still be waiting for its first completion/thread ID.
+            // A pending placement must not point to a deleted virtual folder.
+            foreach (var active in _live.Where(x =>
+                x.ProjectPath.Equals(_project, StringComparison.OrdinalIgnoreCase) &&
+                x.PendingFolderId == id))
+                active.PendingFolderId = SessionOrganization.Unfiled;
+        });
     }
 
     private void MoveHistory(HistoryEntry session, string target)
@@ -864,32 +873,73 @@ public partial class MainWindow : Window
         });
     }
 
+    private void MoveLive(LiveItem session, string target)
+    {
+        if (_project is null || _organization is null ||
+            !session.ProjectPath.Equals(_project, StringComparison.OrdinalIgnoreCase) ||
+            session.CompletionSignalPath is null) return;
+        // Running chats must not disappear into the collapsed Bin. Close the
+        // process first, then use the history menu to archive it.
+        if (target == SessionOrganization.Bin)
+        {
+            FooterStatus.Text = UiText.T("activeMoveDenied");
+            return;
+        }
+        if (target != SessionOrganization.Unfiled &&
+            !_organization.Folders(_project).Any(x => x.Id == target))
+        {
+            ShowError(UiText.T("folderNotFound"));
+            return;
+        }
+        if (session.ClaudeSessionId is { } stableId)
+        {
+            EditFolders(() =>
+            {
+                _organization.Move(session.ProjectPath, stableId, target);
+                session.PendingFolderId = null;
+            });
+        }
+        else
+        {
+            // Codex first needs to report its own stable thread ID. Keep the
+            // selected folder in memory until the session-scoped hook fires.
+            session.PendingFolderId = target;
+        }
+        _collapsedFolders.Remove(SectionKey(target.Length == 0 ? "__unfiled__" : target));
+        UpdateSidebar(preferredTerminalId: session.Id);
+    }
+
     private bool InBin(HistoryEntry session) =>
         _project is not null && _organization?.FolderOf(_project, session.Id)
             == SessionOrganization.Bin;
 
-    // Dragging is available only for inactive history conversations. We do not
-    // accept external drag payloads: the actual session is held in-memory.
+    // Only conversations from the selected project can be moved. The drag
+    // payload is local to this ListBox; no external file paths are accepted.
     private void ConversationsList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        _draggingHistory = null;
-        var element = e.OriginalSource as DependencyObject;
-        var item = element is null ? null :
-            ItemsControl.ContainerFromElement(ConversationsList, element) as ListBoxItem;
-        if (item?.DataContext is SidebarRow { History: { } history } &&
+        _draggingRow = null;
+        var source = e.OriginalSource as DependencyObject;
+        var container = source is null ? null :
+            ItemsControl.ContainerFromElement(ConversationsList, source) as ListBoxItem;
+        if (container?.DataContext is not SidebarRow row) return;
+        if (row.History is { } history &&
             history.Directory.Equals(_project, StringComparison.OrdinalIgnoreCase))
-        {
+            _draggingRow = row;
+        else if (row.Live is { CompletionSignalPath: not null } live &&
+                 live.ProjectPath.Equals(_project, StringComparison.OrdinalIgnoreCase))
+            _draggingRow = row;
+
+        if (_draggingRow is not null)
             _dragStart = e.GetPosition(ConversationsList);
-            _draggingHistory = history;
-        }
     }
 
-    private void ConversationsList_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    private void ConversationsList_PreviewMouseMove(
+        object sender, System.Windows.Input.MouseEventArgs e)
     {
-        if (_draggingHistory is null) return;
+        if (_draggingRow is null) return;
         if (e.LeftButton != MouseButtonState.Pressed)
         {
-            _draggingHistory = null;
+            _draggingRow = null;
             return;
         }
         var position = e.GetPosition(ConversationsList);
@@ -901,10 +951,10 @@ public partial class MainWindow : Window
         {
             System.Windows.DragDrop.DoDragDrop(
                 ConversationsList,
-                new System.Windows.DataObject("AITerminalsLocalSession", _draggingHistory.Id),
+                new System.Windows.DataObject("AITerminalsLocalSession", _draggingRow.Key),
                 System.Windows.DragDropEffects.Move);
         }
-        finally { _draggingHistory = null; }
+        finally { _draggingRow = null; }
     }
 
     private string? DropDestination(object originalSource)
@@ -918,31 +968,33 @@ public partial class MainWindow : Window
 
     private void ConversationsList_DragOver(object sender, System.Windows.DragEventArgs e)
     {
-        if (_draggingHistory is not null &&
+        var destination = DropDestination(e.OriginalSource);
+        var row = _draggingRow;
+        var valid = row is not null && destination is not null &&
             e.Data.GetDataPresent("AITerminalsLocalSession") &&
-            DropDestination(e.OriginalSource) is not null)
-            e.Effects = System.Windows.DragDropEffects.Move;
-        else
-            e.Effects = System.Windows.DragDropEffects.None;
+            (row.History is not null ||
+             (row.Live is not null && destination != SessionOrganization.Bin));
+        e.Effects = valid ? System.Windows.DragDropEffects.Move :
+            System.Windows.DragDropEffects.None;
         e.Handled = true;
     }
 
     private void ConversationsList_Drop(object sender, System.Windows.DragEventArgs e)
     {
-        var conversation = _draggingHistory;
+        var row = _draggingRow;
         var destination = DropDestination(e.OriginalSource);
-        if (conversation is not null && destination is not null &&
+        var valid = row is not null && destination is not null &&
             e.Data.GetDataPresent("AITerminalsLocalSession") &&
-            _project is not null &&
-            conversation.Directory.Equals(_project, StringComparison.OrdinalIgnoreCase))
-        {
-            MoveHistory(conversation, destination);
-            e.Effects = System.Windows.DragDropEffects.Move;
-        }
-        else
-            e.Effects = System.Windows.DragDropEffects.None;
+            (row.History is not null ||
+             (row.Live is not null && destination != SessionOrganization.Bin));
+        if (valid && row!.History is { } historical)
+            MoveHistory(historical, destination!);
+        else if (valid && row!.Live is { } active)
+            MoveLive(active, destination!);
+        e.Effects = valid ? System.Windows.DragDropEffects.Move :
+            System.Windows.DragDropEffects.None;
         e.Handled = true;
-        _draggingHistory = null;
+        _draggingRow = null;
     }
 
     private void ConversationsList_ContextMenuOpening(object sender, ContextMenuEventArgs e)
