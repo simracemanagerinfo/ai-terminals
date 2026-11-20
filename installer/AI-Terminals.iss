@@ -46,7 +46,7 @@ Name: "italian"; MessagesFile: "compiler:Languages\Italian.isl"
 Name: "full"; Description: "Claude Terminal + Codex Terminal"
 Name: "claude"; Description: "Claude Terminal only"
 Name: "codex"; Description: "Codex Terminal only"
-Name: "custom"; Description: "{cm:CustomInstallation}"; Flags: iscustom
+Name: "custom"; Description: "Custom"; Flags: iscustom
 
 [Components]
 Name: "claude"; Description: "Claude Terminal"; Types: full claude custom
