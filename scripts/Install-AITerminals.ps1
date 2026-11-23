@@ -117,8 +117,17 @@ foreach ($agent in $apps) {
             throw "Artifact non disponibile: $artifactName, run $($run.id)"
         }
     }
-    if ([long]$artifact[0].size_in_bytes -le 0 -or [long]$artifact[0].size_in_bytes -gt 512MB) {
-        throw "Dimensione anomala per $artifactName. Operazione annullata."
+    # GitHub exposes different size fields for Release assets and Actions artifacts:
+    # releases.assets[].size (bytes) vs actions.artifacts[].size_in_bytes.
+    # With StrictMode enabled, reading the wrong property terminates the script.
+    $artifactSize = if ($null -ne $release) {
+        [long]$artifact[0].size
+    }
+    else {
+        [long]$artifact[0].size_in_bytes
+    }
+    if ($artifactSize -le 0 -or $artifactSize -gt 512MB) {
+        throw "Dimensione anomala per $artifactName ($artifactSize byte). Operazione annullata."
     }
     if (Get-Process -Name "${agent}Terminal" -ErrorAction SilentlyContinue) {
         throw "Chiudi $exeName prima di aggiornarlo: i processi attivi non vengono terminati automaticamente."
