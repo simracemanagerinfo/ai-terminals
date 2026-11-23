@@ -38,7 +38,7 @@ try {
     $plain = Get-Content -LiteralPath $result.TextPath -Raw -Encoding utf8
     Require ($plain.Contains('RIEPILOGO')) 'Riepilogo testo assente'
     Require ($plain.Contains('Verifica & test')) 'Titolo della email mancante dal testo'
-    Require ($plain.Contains('- Anomalie e qualità')) 'Argomenti non presenti nel testo'
+    Require ($plain.Contains('Anomalie e qualità')) 'Argomenti non presenti nel testo'
     Require ($plain.Contains('- Revisione del pannello non approvata.')) 'Questioni aperte non presenti nel testo'
     Require ($plain.Contains('Responsabile: Anna')) 'Responsabilità non presente nel testo'
 
@@ -59,6 +59,23 @@ try {
     Require (-not $html.Contains('<script')) 'JavaScript non consentito nell email'
     Require (-not $html.Contains('http://')) 'L email non deve richiamare contenuti esterni'
     Require (-not $html.Contains('https://')) 'L email non deve richiamare contenuti esterni'
+    Require ($result.MinutesStyle -eq 'Bilanciato') 'Stile predefinito non corretto'
+    Require ($html.Contains('<p style="margin:0 0 10px 0;">Anomalie e qualità</p>')) 'Argomenti bilanciati non sono paragrafi'
+
+    # Tutti e tre gli stili con lo stesso JSON: testiamo la resa HTML,
+    # senza consumare token IA né modificare i contenuti.
+    $discorsivo = & $runner @args -MinutesStyle Discorsivo
+    $discHtml = Get-Content -LiteralPath $discorsivo.HtmlPath -Raw -Encoding utf8
+    Require ($discHtml.Contains('<p style="margin:0 0 10px 0;">Anomalie e qualità</p>')) 'Stile discorsivo senza paragrafi'
+    Require ($discHtml.Contains('<p style="margin:0 0 9px 0;">')) 'Cronologia discorsiva senza paragrafi'
+    $sintetico = & $runner @args -MinutesStyle Sintetico
+    $synHtml = Get-Content -LiteralPath $sintetico.HtmlPath -Raw -Encoding utf8
+    Require ($synHtml.Contains('<li style="margin:0 0 5px 0;">Anomalie e qualità</li>')) 'Stile sintetico senza elenchi'
+    Require ($synHtml.Contains('<table ')) 'Tabella attività non mantenuta nello stile sintetico'
+    Require ($synHtml.Contains('&lt;script&gt;')) 'Protezione XSS mancante nello stile sintetico'
+    $synText = Get-Content -LiteralPath $sintetico.TextPath -Raw -Encoding utf8
+    Require ($synText.Contains('- Anomalie e qualità')) 'Testo sintetico senza punti'
+
     $structured = & $runner @args -AsJson | ConvertFrom-Json
     Require ([bool]$structured.HtmlPath) 'AsJson non ha fornito il percorso HTML'
     Require ([bool]$structured.TextPath) 'AsJson non ha fornito il percorso TXT'
