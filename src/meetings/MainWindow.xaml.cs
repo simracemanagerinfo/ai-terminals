@@ -44,19 +44,18 @@ public partial class MainWindow : Window
         if (_audioCapture is not null || _cancelSource is not null)
             return;
 
-        using var dialog = new System.Windows.Forms.FolderBrowserDialog
+        var dialog = new OpenFolderDialog
         {
-            Description = "Scegli dove conservare registrazioni, trascrizioni e minute",
-            ShowNewFolderButton = true,
-            SelectedPath = Directory.Exists(_workspaceRoot) ? _workspaceRoot :
+            Title = "Scegli dove conservare registrazioni, trascrizioni e minute",
+            InitialDirectory = Directory.Exists(_workspaceRoot) ? _workspaceRoot :
                 Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
         };
-        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+        if (dialog.ShowDialog(this) != true)
             return;
 
         try
         {
-            var folder = WorkspaceStore.ValidateRoot(dialog.SelectedPath);
+            var folder = WorkspaceStore.ValidateRoot(dialog.FolderName);
             WorkspaceStore.SavePreferredRoot(folder);
             _workspaceRoot = folder;
             WorkspaceInput.Text = folder;
