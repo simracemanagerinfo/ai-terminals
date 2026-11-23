@@ -8,10 +8,14 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <AssemblyName>MeetingNotes</AssemblyName>
     <RootNamespace>MeetingNotes</RootNamespace>
-    <Version>0.1.0</Version>
+    <Version>0.4.0</Version>
+    <ApplicationIcon>Resources\MeetingNotes.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="transcriber\**\*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Resources\MeetingNotes.ico" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="NAudio" Version="3.3.0" />
@@ -26,4 +30,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+  <Target Name="GenerateMeetingNotesIcon" BeforeTargets="PrepareForBuild">
+    <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)\..\..\scripts\meetings\New-MeetingNotesIcon.ps1&quot; -OutputPath &quot;$(MSBuildProjectDirectory)\Resources\MeetingNotes.ico&quot;" />
+  </Target>
 </Project>
