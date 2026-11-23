@@ -274,3 +274,54 @@ un collaudo sul computer dell'utente.
 La trascrizione NON parte automaticamente con la registrazione:
 si avvia con il pulsante "Trascrivi offline", così l'utente può
 verificare le tracce e scegliere quali trattare.
+
+
+## Stile delle minute, icona e registrazioni più lunghe
+
+Dalla versione 0.4 la schermata offre tre scelte **indipendenti** dal livello
+di semplificazione linguistica (il valore 80% può restare invariato):
+
+- **Discorsivo**: riepilogo e argomenti in paragrafi con più contesto;
+  decisioni spiegate in frasi; tabella attività sempre presente.
+- **Bilanciato** (predefinito): breve riepilogo e paragrafi sugli argomenti;
+  decisioni concise, questioni aperte in elenco e tabella attività.
+- **Sintetico**: riepilogo breve ed elenchi puntati per argomenti e decisioni;
+  tabella attività invariata.
+
+La scelta influisce sia sulle istruzioni date a Claude/Codex, sia
+sull'impaginazione HTML e TXT. Le trascrizioni non sono alterate; per cambiare
+stile di una minuta già creata occorre rigenerarla. Il formato HTML resta
+adatto a Outlook e l'app non deve inventare decisioni o scadenze.
+
+### Icona e avvio rapido
+
+Durante la compilazione viene creata una **icona Windows .ico** specifica,
+incorporata in MeetingNotes.exe e nella finestra. Il file binario generato
+non è conservato in Git.
+
+L'installer crea anche un collegamento **Meeting Notes** nel menu Start
+dell'utente corrente (senza amministratore). Dopo l'aggiornamento:
+
+1. Premi **Win**, cerca **Meeting Notes** e apri l'app.
+2. Fai clic destro sull'icona nella barra delle applicazioni e seleziona
+   **Aggiungi alla barra delle applicazioni** (o **Fissa alla barra**).
+
+Il collegamento punta alla posizione stabile
+`C:\Users\Overdata\Documents\workspace\personale\ai-terminals-voice\out\MeetingNotes\MeetingNotes.exe`
+e continua a funzionare dopo i successivi aggiornamenti dell'installer.
+
+### Cosa accade se condividi lo schermo
+
+L'acquisizione audio è WASAPI, distinta dal contenuto video condiviso:
+attivare o interrompere la condivisione di Teams **non invia un comando
+di stop** al registratore. Può però cambiare il dispositivo di input/output
+audio o il routing di Teams; in questo caso il WAV potrebbe diventare
+silenzioso o il dispositivo potrebbe interrompere la cattura.
+**La continuità non è stata ancora collaudata** al cambio di condivisione:
+prova con audio non riservato, controlla entrambi i WAV.
+
+Il limite di registrazione per collaudo è stato portato da 10 a
+**120 minuti** con un timer `hh:mm:ss`.
+I WAV non compressi possono occupare molti gigabyte: verifica lo spazio
+libero e interrompi manualmente quando la riunione termina. La trascrizione
+offline è avviata separatamente, dopo aver salvato i WAV.
