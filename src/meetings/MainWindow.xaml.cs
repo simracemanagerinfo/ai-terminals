@@ -288,6 +288,8 @@ public partial class MainWindow : Window
             SttStatusText.Text = automatic
                 ? "Modello Whisper mancante: trascrizione automatica non avviata; WAV conservati."
                 : "Seleziona un modello Whisper multilingua prima di trascrivere.";
+            if (automatic)
+                AudioStatusText.Text = "Registrazione salvata. Whisper non configurato: WAV conservati, seleziona il modello per riprovare.";
             if (!automatic)
                 MessageBox.Show(this, "Seleziona ggml-base.bin (o un modello multilingua .bin) prima di trascrivere.",
                     "Modello offline mancante", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -644,7 +646,7 @@ public partial class MainWindow : Window
 
     private void StartAudio_Click(object sender, RoutedEventArgs e)
     {
-        if (_audioCapture is not null || _transcribeCts is not null)
+        if (_audioCapture is not null || _transcribeCts is not null || _cancelSource is not null)
             return;
         if (RecordingPermission.IsChecked != true)
         {
