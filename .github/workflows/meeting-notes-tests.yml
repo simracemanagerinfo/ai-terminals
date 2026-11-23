@@ -64,6 +64,17 @@ jobs:
               throw "Missing Meeting Notes artifact: $file"
             }
           }
+      - name: Publish offline CPU Whisper transcriber
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet publish src/meetings/transcriber/MeetingTranscriber.csproj --configuration Release --runtime win-x64 --self-contained true --output "$env:GITHUB_WORKSPACE/out/MeetingNotes/transcriber"
+          if ($LASTEXITCODE -ne 0) { throw 'Offline transcriber publish failed' }
+          if (-not (Test-Path -LiteralPath 'out/MeetingNotes/transcriber/MeetingTranscriber.exe' -PathType Leaf)) {
+            throw 'Offline transcriber executable not present.'
+          }
+          & './out/MeetingNotes/transcriber/MeetingTranscriber.exe' --self-test
+          if ($LASTEXITCODE -ne 0) { throw 'WAV resampler test failed.' }
       - name: Validate HTML clipboard offsets
         shell: pwsh
         run: |
