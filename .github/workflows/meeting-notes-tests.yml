@@ -4,6 +4,7 @@ on:
     branches: [feature/meeting-notes]
     paths:
       - 'scripts/meetings/**'
+      - 'src/meetings/**'
       - 'tests/MeetingMinutes.Tests.ps1'
       - '.github/workflows/meeting-notes-tests.yml'
   workflow_dispatch:
@@ -14,9 +15,12 @@ permissions:
 jobs:
   meeting-notes:
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
       - name: Validate PowerShell syntax
         shell: pwsh
         run: |
@@ -42,3 +46,30 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           & './tests/MeetingMinutes.Tests.ps1'
+      - name: Build independent MeetingNotes Windows app
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet publish src/meetings/MeetingNotes.csproj --configuration Release --runtime win-x64 --self-contained true --output "$env:GITHUB_WORKSPACE/out/MeetingNotes"
+          if ($LASTEXITCODE -ne 0) { throw 'Meeting Notes publish failed' }
+          foreach ($file in @(
+            'MeetingNotes.exe',
+            'scripts/Invoke-MeetingMinutes.ps1',
+            'scripts/Invoke-MeetingProvider.ps1'
+          )) {
+            if (-not (Test-Path -LiteralPath (Join-Path 'out/MeetingNotes' $file))) {
+              throw "Missing Meeting Notes artifact: $file"
+            }
+          }
+      - name: Validate HTML clipboard offsets
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet run --project tests/MeetingNotesSmoke/MeetingNotesSmoke.csproj --configuration Release
+          if ($LASTEXITCODE -ne 0) { throw 'HTML clipboard smoke failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MeetingNotes-win-x64
+          path: out/MeetingNotes/
+          if-no-files-found: error
+          retention-days: 14
