@@ -58,6 +58,9 @@ da collaudare sul PC aziendale con account e policy autorizzati.
 - Installer GitHub CLI dedicato, senza toccare installer degli altri terminali.
 
 Verifiche automatizzate: Windows build, PowerShell, CLI mock e test offsets CF_HTML.
+Build GUI e artifact dedicato: run GitHub Actions 45133254586,
+https://github.com/simracemanagerinfo/ai-terminals/actions/runs/45133254586
+Pacchetto: MeetingNotes-win-x64 (autonomo, non incluso nelle release stabili).
 Resta da confermare l'uso con GUI, login CLI reale e Outlook desktop sul PC
 aziendale. Non dichiarare completo il collaudo E2E prima di questi riscontri.
 
