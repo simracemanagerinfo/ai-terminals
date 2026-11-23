@@ -90,7 +90,7 @@ public partial class MainWindow : Window
 
     private void BrowseWorkspace_Click(object sender, RoutedEventArgs e)
     {
-        if (_audioCapture is not null || _cancelSource is not null)
+        if (_audioCapture is not null || _cancelSource is not null || _transcribeCts is not null)
             return;
 
         var dialog = new OpenFolderDialog
@@ -665,6 +665,8 @@ public partial class MainWindow : Window
         {
             var root = WorkspaceStore.Recordings(_workspaceRoot);
             _audioCapture = AudioCaptureSession.Start(root, mic, system);
+            _keepAudioForCurrentRecording = KeepOriginalAudioInput.IsChecked == true;
+            KeepOriginalAudioInput.IsEnabled = false;
             _lastAudioFolder = _audioCapture.Folder;
             _audioStartedUtc = DateTime.UtcNow;
             CaptureMicrophone.IsEnabled = false;
@@ -712,9 +714,11 @@ public partial class MainWindow : Window
         _audioTimer.Stop();
         StopAudioButton.IsEnabled = false;
         AudioStatusText.Text = "Finalizzazione dei file WAV…";
+        AudioCaptureResult? completed = null;
         try
         {
             var result = await session.StopAsync();
+            completed = result;
             _lastAudioFolder = result.Folder;
             OpenAudioFolderButton.IsEnabled = true;
             RecordingInput.Text = _lastAudioFolder ?? "Registrazione completata";
@@ -736,9 +740,23 @@ public partial class MainWindow : Window
             _stoppingAudio = false;
             CaptureMicrophone.IsEnabled = true;
             CaptureSystem.IsEnabled = true;
-            StartAudioButton.IsEnabled = true;
-            BrowseWorkspaceButton.IsEnabled = _cancelSource is null;
+            StartAudioButton.IsEnabled = _transcribeCts is null;
+            BrowseWorkspaceButton.IsEnabled = _cancelSource is null && _transcribeCts is null;
+            KeepOriginalAudioInput.IsEnabled = _transcribeCts is null;
             RecordingPermission.IsChecked = false;
+        }
+
+        if (completed is not null && completed.CapturedBytes > 0)
+        {
+            // Transcribe the exact tracks of the completed session, not whichever
+            // files happen to be selected in the manual STT panel.
+            await TranscribeRecordingAsync(
+                completed.Folder, completed.MicrophonePath, completed.SystemPath,
+                automatic: true, keepOriginal: _keepAudioForCurrentRecording);
+        }
+        else if (completed is not null)
+        {
+            SttStatusText.Text = "Nessun campione audio utile: trascrizione automatica non avviata. WAV conservati.";
         }
     }
 
