@@ -163,3 +163,19 @@ finally
     if (Directory.Exists(retentionRoot))
         Directory.Delete(retentionRoot, recursive: true);
 }
+
+
+// STT errors must be actionable without leaking transcript or full file paths.
+var reported = "{\"Code\":\"STT_FAILED\",\"Stage\":\"conversione WAV AUDIO PC\",\"ErrorType\":\"InvalidDataException\"}";
+var diagnostic = SttFailureFormatter.Explain("Native init info\n" + reported + "\n", 1);
+if (!diagnostic.Contains("conversione dell'audio del PC", StringComparison.Ordinal) ||
+    !diagnostic.Contains("WAV", StringComparison.Ordinal) ||
+    diagnostic.Contains("Native init info", StringComparison.Ordinal))
+    throw new InvalidOperationException("STT structured diagnostics are not actionable or expose raw stderr.");
+var invalidDiagnostic = SttFailureFormatter.Explain(
+    "{\"Code\":\"STT_FAILED\",\"Stage\":\"Dati riservati 2026\",\"ErrorType\":\"Secret\"}", -1);
+if (invalidDiagnostic.Contains("Dati riservati", StringComparison.Ordinal) ||
+    invalidDiagnostic.Contains("Secret", StringComparison.Ordinal) ||
+    !invalidDiagnostic.Contains("0xFFFFFFFF", StringComparison.Ordinal))
+    throw new InvalidOperationException("STT diagnostics are not sanitized.");
+Console.WriteLine("[PASS] Whisper error stage, fallback code and private stderr suppression.");
