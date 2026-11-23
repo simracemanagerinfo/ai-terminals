@@ -13,13 +13,56 @@
       <RowDefinition Height="*"/>
       <RowDefinition Height="Auto"/>
     </Grid.RowDefinitions>
-    <Border Grid.Row="0" Background="White" BorderBrush="#DCE6EA" BorderThickness="0,0,0,1" Padding="26,19">
-      <StackPanel>
-        <TextBlock Text="MEETING NOTES" Foreground="#176F71" FontWeight="Bold" FontSize="11"/>
-        <TextBlock Text="Dalla trascrizione alla minuta pronta per Outlook" FontWeight="SemiBold" FontSize="21" Margin="0,5,0,0"/>
-        <TextBlock Text="Tutto il flusso locale fino alla chiamata IA. Nessun bot nelle riunioni."
-                   Foreground="#647887" Margin="0,4,0,0"/>
-      </StackPanel>
+    <Border Grid.Row="0" Background="White" BorderBrush="#DCE6EA" BorderThickness="0,0,0,1" Padding="24,15">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+          <TextBlock Text="MEETING NOTES" Foreground="#176F71" FontWeight="Bold" FontSize="11"/>
+          <TextBlock Text="Dalla trascrizione alla minuta pronta per Outlook"
+                     FontWeight="SemiBold" FontSize="21" Margin="0,5,0,0" TextWrapping="Wrap"/>
+          <TextBlock Text="Tutto il flusso locale fino alla chiamata IA. Nessun bot nelle riunioni."
+                     Foreground="#647887" Margin="0,4,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- Accesso immediato: stessi handler e stessi stati dei pulsanti laterali. -->
+        <Border Grid.Column="1" Margin="16,0,0,0" Padding="13,10"
+                CornerRadius="10" Background="#F2F8F8" BorderBrush="#D1E2E2" BorderThickness="1"
+                VerticalAlignment="Center" MinWidth="238">
+          <StackPanel>
+            <Grid Margin="0,0,0,8">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <TextBlock x:Name="QuickRecordingStatus" Grid.Column="0"
+                         Text="Pronto per registrare" Foreground="#176F71"
+                         FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"
+                         TextTrimming="CharacterEllipsis"/>
+              <TextBlock x:Name="QuickRecordingTimer" Grid.Column="1"
+                         Text="00:00:00" FontSize="13" FontWeight="SemiBold"
+                         Foreground="#173044" Margin="8,0,0,0"
+                         VerticalAlignment="Center" FontFamily="Consolas"/>
+            </Grid>
+            <StackPanel Orientation="Horizontal">
+              <Button x:Name="QuickStartAudioButton" Content="● Registra"
+                      Click="StartAudio_Click"
+                      IsEnabled="{Binding IsEnabled, ElementName=StartAudioButton}"
+                      Background="#176F71" Foreground="White" BorderBrush="#176F71"
+                      Padding="17,9" FontWeight="SemiBold" Margin="0,0,8,0"
+                      ToolTip="Avvia la registrazione delle sorgenti selezionate nella colonna sinistra"/>
+              <Button x:Name="QuickStopAudioButton" Content="■ Ferma"
+                      Click="StopAudio_Click"
+                      IsEnabled="{Binding IsEnabled, ElementName=StopAudioButton}"
+                      Padding="14,9" FontWeight="SemiBold"
+                      ToolTip="Ferma la registrazione e avvia la trascrizione offline"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+      </Grid>
     </Border>
 
     <Grid Grid.Row="1" Margin="20,18,20,12">
