@@ -288,6 +288,7 @@ public partial class MainWindow : Window
             SttStatusText.Text = automatic
                 ? "Modello Whisper mancante: trascrizione automatica non avviata; WAV conservati."
                 : "Seleziona un modello Whisper multilingua prima di trascrivere.";
+            QuickRecordingStatus.Text = "WAV conservati";
             if (automatic)
                 AudioStatusText.Text = "Registrazione salvata. Whisper non configurato: WAV conservati, seleziona il modello per riprovare.";
             if (!automatic)
@@ -299,6 +300,7 @@ public partial class MainWindow : Window
         if (!File.Exists(exe))
         {
             SttStatusText.Text = "Whisper non disponibile: WAV conservati.";
+            QuickRecordingStatus.Text = "WAV conservati";
             if (!automatic)
                 MessageBox.Show(this, "Il motore Whisper non è presente nel pacchetto.",
                     "Motore STT mancante", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -307,6 +309,7 @@ public partial class MainWindow : Window
         if (microphonePath is null && systemPath is null)
         {
             SttStatusText.Text = "Nessuna sorgente audio valida: WAV conservati.";
+            QuickRecordingStatus.Text = "WAV conservati";
             return;
         }
 
@@ -322,6 +325,7 @@ public partial class MainWindow : Window
         SttStatusText.Text = automatic
             ? "Registrazione terminata. Trascrizione offline automatica in corso…"
             : "Trascrizione CPU in corso… nessun upload.";
+        QuickRecordingStatus.Text = "Trascrizione…";
         if (automatic)
             AudioStatusText.Text = "WAV salvati; Whisper sta creando il TXT. Non chiudere l'app.";
 
@@ -392,6 +396,7 @@ public partial class MainWindow : Window
             _transcriptPath = path;
             _savedTranscriptText = content;
             SttStatusText.Text = "Trascrizione completata e salvata. Controlla il testo prima di generare la minuta.";
+            QuickRecordingStatus.Text = "TXT pronto";
             StatusText.Text = "TXT offline pronto per la revisione; la minuta non parte automaticamente.";
 
             if (automatic && !keepOriginal)
@@ -424,12 +429,14 @@ public partial class MainWindow : Window
         catch (OperationCanceledException)
         {
             SttStatusText.Text = "Trascrizione annullata o scaduta. WAV conservati; nessun upload.";
+            QuickRecordingStatus.Text = "WAV conservati";
             if (automatic)
                 AudioStatusText.Text = "Whisper interrotto: WAV originali conservati per un nuovo tentativo.";
         }
         catch (Exception ex)
         {
             SttStatusText.Text = "Trascrizione non riuscita. WAV originali conservati.";
+            QuickRecordingStatus.Text = "Errore STT";
             if (automatic)
                 AudioStatusText.Text = "Trascrizione fallita; i file audio sono stati conservati.";
             MessageBox.Show(this, ex.Message, "Whisper offline",
@@ -454,6 +461,7 @@ public partial class MainWindow : Window
     private void CancelTranscribe_Click(object sender, RoutedEventArgs e)
     {
         SttStatusText.Text = "Annullamento trascrizione in corso…";
+        QuickRecordingStatus.Text = "Annullamento…";
         _transcribeCts?.Cancel();
     }
 
@@ -492,6 +500,7 @@ public partial class MainWindow : Window
         GenerateButton.IsEnabled = !busy && _transcribeCts is null;
         CancelButton.IsEnabled = busy;
         TranscribeButton.IsEnabled = !busy && _transcribeCts is null;
+        StartAudioButton.IsEnabled = !busy && _audioCapture is null && _transcribeCts is null;
         ProviderInput.IsEnabled = !busy;
         MinutesStyleInput.IsEnabled = !busy;
         BrowseWorkspaceButton.IsEnabled = !busy && _audioCapture is null;
@@ -650,10 +659,16 @@ public partial class MainWindow : Window
             return;
         if (RecordingPermission.IsChecked != true)
         {
-            MessageBox.Show(this,
-                "Conferma prima che la registrazione di questa prova sia consentita dalle policy aziendali.",
-                "Registrazione audio", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
+            // Il tasto rapido deve essere davvero utilizzabile senza scorrere
+            // alla conferma nella barra laterale: chiediamo consenso esplicito.
+            var confirmation = MessageBox.Show(this,
+                "Confermi che la registrazione di questa riunione è consentita dalle policy aziendali e che le persone coinvolte sono state informate quando necessario?",
+                "Autorizzazione alla registrazione",
+                MessageBoxButton.YesNo, MessageBoxImage.Question,
+                MessageBoxResult.No);
+            if (confirmation != MessageBoxResult.Yes)
+                return;
+            RecordingPermission.IsChecked = true;
         }
         var mic = CaptureMicrophone.IsChecked == true;
         var system = CaptureSystem.IsChecked == true;
@@ -678,11 +693,14 @@ public partial class MainWindow : Window
             StopAudioButton.IsEnabled = true;
             OpenAudioFolderButton.IsEnabled = false;
             _audioTimer.Start();
+            QuickRecordingStatus.Text = "In registrazione";
+            QuickRecordingTimer.Text = "00:00:00";
             AudioStatusText.Text = "● Registrazione locale in corso · 00:00:00. Nessun upload.";
         }
         catch (Exception ex)
         {
             AudioStatusText.Text = "Avvio audio non riuscito";
+            QuickRecordingStatus.Text = "Errore dispositivo";
             MessageBox.Show(this, ex.Message, "Dispositivo audio non disponibile",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -698,8 +716,9 @@ public partial class MainWindow : Window
             _ = StopAudioAsync();
             return;
         }
+        QuickRecordingTimer.Text = elapsed.ToString(@"hh\:mm\:ss");
         AudioStatusText.Text = "● Registrazione locale in corso · " +
-            elapsed.ToString(@"hh\:mm\:ss") + ". Nessun upload.";
+            QuickRecordingTimer.Text + ". Nessun upload.";
     }
 
     private async void StopAudio_Click(object sender, RoutedEventArgs e)
@@ -715,6 +734,7 @@ public partial class MainWindow : Window
         var session = _audioCapture;
         _audioTimer.Stop();
         StopAudioButton.IsEnabled = false;
+        QuickRecordingStatus.Text = "Salvataggio WAV…";
         AudioStatusText.Text = "Finalizzazione dei file WAV…";
         AudioCaptureResult? completed = null;
         try
@@ -730,6 +750,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            QuickRecordingStatus.Text = "WAV da verificare";
             AudioStatusText.Text = "Registrazione interrotta: verificare i file audio locali.";
             MessageBox.Show(this, ex.Message, "Registrazione audio",
                 MessageBoxButton.OK, MessageBoxImage.Error);
@@ -758,6 +779,7 @@ public partial class MainWindow : Window
         }
         else if (completed is not null)
         {
+            QuickRecordingStatus.Text = "Audio non rilevato";
             SttStatusText.Text = "Nessun campione audio utile: trascrizione automatica non avviata. WAV conservati.";
         }
     }
