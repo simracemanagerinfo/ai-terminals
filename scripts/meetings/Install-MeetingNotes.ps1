@@ -110,7 +110,8 @@ try {
     foreach ($required in @(
         'MeetingNotes.exe',
         'scripts\Invoke-MeetingMinutes.ps1',
-        'scripts\Invoke-MeetingProvider.ps1'
+        'scripts\Invoke-MeetingProvider.ps1',
+        'transcriber\MeetingTranscriber.exe'
     )) {
         if (-not (Test-Path -LiteralPath (Join-Path $staging $required) -PathType Leaf)) {
             throw "Pacchetto incompleto, manca: $required. La versione precedente resta intatta."
