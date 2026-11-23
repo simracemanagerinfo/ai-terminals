@@ -11,6 +11,9 @@
     <Version>0.1.0</Version>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="transcriber\**\*.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="NAudio" Version="3.3.0" />
   </ItemGroup>
   <ItemGroup>
