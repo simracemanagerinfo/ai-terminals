@@ -193,6 +193,9 @@ https://github.com/simracemanagerinfo/ai-terminals/actions/runs/45165426726
   salvate/corrotte, TXT mancante/vuoto, flag ON, WAV non appartenenti alla
   registrazione e pulizia circoscritta a una sessione valida.
 - Convalida E2E sui dispositivi audio reali ancora da fare.
+- GitHub Actions Windows PASS: run 45172289619; test preferenze, pulizia sicura
+  WAV, WPF, Whisper CPU, icona, appunti Outlook e installazione senza gh.
+  https://github.com/simracemanagerinfo/ai-terminals/actions/runs/45172289619
 
 ## Prossime fasi (NON ancora implementate)
 - Collaudo su PC aziendale di Whisper CPU con modello reale, accuratezza e prestazioni.
