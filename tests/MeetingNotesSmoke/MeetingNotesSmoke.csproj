@@ -10,5 +10,7 @@
   <ItemGroup>
     <Compile Include="..\..\src\meetings\OutlookClipboard.cs" Link="OutlookClipboard.cs"/>
     <Compile Include="..\..\src\meetings\WorkspaceStore.cs" Link="WorkspaceStore.cs"/>
+    <Compile Include="..\..\src\meetings\RecordingPreferenceStore.cs" Link="RecordingPreferenceStore.cs"/>
+    <Compile Include="..\..\src\meetings\RecordingAudioRetention.cs" Link="RecordingAudioRetention.cs"/>
   </ItemGroup>
 </Project>
