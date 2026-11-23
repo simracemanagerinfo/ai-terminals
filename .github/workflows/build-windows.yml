@@ -72,8 +72,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          # A PowerShell test throws on failure, but does not reset $LASTEXITCODE.
           & './tests/InstallerChecksum.Tests.ps1'
-          if ($LASTEXITCODE -ne 0) { throw 'Published checksum regression test failed' }
           & './scripts/Install-AITerminals.ps1' -App Both
           foreach ($agent in @('Claude','Codex')) {
             $exe = Join-Path $env:LOCALAPPDATA "PowerShellCustomization/$($agent)Terminal/$($agent)Terminal.exe"
