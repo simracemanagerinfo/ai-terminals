@@ -172,25 +172,52 @@ internal static class Program
 
     private static void SelfTest()
     {
-        var sourcePath = Path.Combine(Path.GetTempPath(), "stt-test-" + Guid.NewGuid().ToString("N") + ".wav");
-        var destPath = sourcePath + ".converted.wav";
-        try
+        // Both PCM stereo and IEEE float stereo occur on actual Windows devices.
+        // The prior test covered only 16-bit PCM, not WASAPI float loopback.
+        foreach (var inputFormat in new[]
         {
-            using (var writer = new WaveFileWriter(sourcePath, new WaveFormat(48000, 16, 2)))
+            new WaveFormat(48000, 16, 2),
+            WaveFormat.CreateIeeeFloatWaveFormat(48000, 2)
+        })
+        {
+            var sourcePath = Path.Combine(Path.GetTempPath(), "stt-test-" + Guid.NewGuid().ToString("N") + ".wav");
+            var destPath = sourcePath + ".converted.wav";
+            try
             {
-                var source = new byte[48000 * 2 * 2];
-                writer.Write(source, 0, source.Length);
+                using (var writer = new WaveFileWriter(sourcePath, inputFormat))
+                {
+                    var source = new byte[48000 * inputFormat.BlockAlign];
+                    writer.Write(source, 0, source.Length);
+                }
+
+                NormalizeToPcm16k(sourcePath, destPath);
+                using (var r = new WaveFileReader(destPath))
+                {
+                    if (r.WaveFormat.SampleRate != 16000 || r.WaveFormat.Channels != 1 ||
+                        r.WaveFormat.BitsPerSample != 16 || r.Length <= 0)
+                        throw new InvalidDataException("Audio normalization self-test failed.");
+                }
+
+                // A header-only WAV should be skipped rather than aborting
+                // transcription of the other, healthy microphone/PC track.
+                using (var writer = new WaveFileWriter(sourcePath, inputFormat))
+                {
+                    // Intentionally no audio data.
+                }
+                var rejectedShort = false;
+                try { NormalizeToPcm16k(sourcePath, destPath); }
+                catch (InvalidDataException ex) when (ex.Message == "AUDIO_TOO_SHORT")
+                {
+                    rejectedShort = true;
+                }
+                if (!rejectedShort)
+                    throw new InvalidDataException("Short/silent WAV source was not detected.");
             }
-            NormalizeToPcm16k(sourcePath, destPath);
-            using var r = new WaveFileReader(destPath);
-            if (r.WaveFormat.SampleRate != 16000 || r.WaveFormat.Channels != 1 ||
-                r.WaveFormat.BitsPerSample != 16 || r.Length <= 0)
-                throw new InvalidDataException("Audio normalization self-test failed.");
-        }
-        finally
-        {
-            if (File.Exists(sourcePath)) File.Delete(sourcePath);
-            if (File.Exists(destPath)) File.Delete(destPath);
+            finally
+            {
+                if (File.Exists(sourcePath)) File.Delete(sourcePath);
+                if (File.Exists(destPath)) File.Delete(destPath);
+            }
         }
     }
 }
