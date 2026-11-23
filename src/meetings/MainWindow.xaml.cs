@@ -372,15 +372,22 @@ public partial class MainWindow : Window
                 throw;
             }
             var output = await stdout;
-            _ = await stderr; // Never expose transcript content in logs/UI.
+            var diagnostic = await stderr;
             if (process.ExitCode != 0)
                 throw new InvalidOperationException(
-                    "Whisper non ha terminato correttamente la trascrizione. Controlla modello e WAV.");
+                    SttFailureFormatter.Explain(diagnostic, process.ExitCode));
 
             using var json = JsonDocument.Parse(output);
             var result = json.RootElement;
             var path = result.GetProperty("TranscriptPath").GetString();
             var segments = result.GetProperty("Segments").GetInt32();
+            var skippedSources = result.TryGetProperty("SkippedSources", out var skippedValue) &&
+                skippedValue.ValueKind == JsonValueKind.Array ?
+                skippedValue.EnumerateArray()
+                    .Where(item => item.ValueKind == JsonValueKind.String)
+                    .Select(item => item.GetString())
+                    .Where(value => value is "MICROFONO" or "AUDIO PC").ToArray() :
+                Array.Empty<string?>();
             if (segments < 1 || string.IsNullOrWhiteSpace(path) || !File.Exists(path))
                 throw new InvalidDataException("Whisper non ha prodotto un TXT valido.");
 
@@ -395,11 +402,19 @@ public partial class MainWindow : Window
             TranscriptInput.Text = path;
             _transcriptPath = path;
             _savedTranscriptText = content;
-            SttStatusText.Text = "Trascrizione completata e salvata. Controlla il testo prima di generare la minuta.";
+            SttStatusText.Text = skippedSources.Length > 0
+                ? "Trascrizione parziale: una sorgente audio era troppo breve. WAV conservati. Controlla il TXT."
+                : "Trascrizione completata e salvata. Controlla il testo prima di generare la minuta.";
             QuickRecordingStatus.Text = "TXT pronto";
             StatusText.Text = "TXT offline pronto per la revisione; la minuta non parte automaticamente.";
 
-            if (automatic && !keepOriginal)
+            if (automatic && skippedSources.Length > 0)
+            {
+                AudioStatusText.Text = "TXT parziale: una traccia audio non era utilizzabile. WAV conservati per verifica.";
+                OpenAudioFolderButton.IsEnabled = Directory.Exists(recordingFolder);
+                RecordingInput.Text = recordingFolder;
+            }
+            else if (automatic && !keepOriginal)
             {
                 try
                 {
