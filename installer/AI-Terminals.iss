@@ -9,7 +9,7 @@
 ; A new installer can display a Windows SmartScreen reputation warning until
 ; this release is signed and its publisher reputation is established.
 
-#define AppVersion "1.1.1"
+#define AppVersion "1.1.2"
 
 [Setup]
 AppId={{64A5013C-F387-4D38-A961-5018688BA1D7}
@@ -36,7 +36,7 @@ RestartApplications=no
 AllowNoIcons=yes
 UninstallDisplayName=AI Terminals
 SetupLogging=no
-VersionInfoVersion=1.1.1.0
+VersionInfoVersion=1.1.2.0
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
