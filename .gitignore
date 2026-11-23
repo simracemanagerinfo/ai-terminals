@@ -25,3 +25,6 @@
 # Whisper speech model weights (user-managed, never commit)
 **/ggml-*.bin
 **/Models/ggml-*.bin
+
+# Icona generata nel build Windows per Meeting Notes
+/src/meetings/Resources/MeetingNotes.ico
