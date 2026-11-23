@@ -91,3 +91,64 @@ non si dichiara una conformità formale ASD-STE100 in italiano.
   revisione umana prima della diffusione.
 - Codex in sandbox read-only non equivale a isolamento totale dei dati.
 - Non usare le minute reali come esempi committati nel repository GitHub.
+
+## Step 2 — MeetingNotes.exe (app Windows)
+
+La prima interfaccia Windows è indipendente da ClaudeTerminal.exe e CodexTerminal.exe.
+Il programma riutilizza il generatore PowerShell testato nella Fase 1.
+La build avviene su GitHub Actions con .NET 10 e Windows x64; il pacchetto è
+autonomo e non richiede SDK o privilegi amministrativi per l'avvio.
+PowerShell 7 e il provider CLI configurato devono essere disponibili sul PC.
+
+### Aggiornamento, installazione e avvio (PowerShell)
+
+Comandi completi, da qualunque cartella:
+
+~~~powershell
+$project = 'C:\Users\Overdata\Documents\workspace\personale\ai-terminals-voice'
+Set-Location -LiteralPath $project
+git pull --ff-only origin feature/meeting-notes
+if ($LASTEXITCODE -ne 0) { throw 'Git pull fallito.' }
+pwsh -NoProfile -File "$project\tests\MeetingMinutes.Tests.ps1"
+pwsh -NoProfile -File "$project\scripts\meetings\Install-MeetingNotes.ps1"
+& "$project\out\MeetingNotes\MeetingNotes.exe"
+~~~
+
+La procedura usa GitHub CLI (gh) già autenticato per scaricare l'ultima build
+riuscita del workflow meeting-notes-tests.yml e la verifica prima di sostituire
+l'installazione precedente. Se gh non è disponibile, compilazione locale
+alternativa (richiede .NET 10 SDK):
+
+~~~powershell
+$project = 'C:\Users\Overdata\Documents\workspace\personale\ai-terminals-voice'
+Set-Location -LiteralPath $project
+dotnet publish "$project\src\meetings\MeetingNotes.csproj" -c Release -r win-x64 --self-contained true -o "$project\out\MeetingNotes"
+& "$project\out\MeetingNotes\MeetingNotes.exe"
+~~~
+
+### Uso
+
+1. Seleziona un file TXT UTF-8 e indica il titolo della riunione.
+2. Scegli Claude Code, Codex oppure Mock. Mock richiede un file JSON sintetico;
+   non usa la rete.
+3. Per i provider reali, conferma che la trascrizione può essere inviata in
+   base alle policy aziendali. Il CLI non effettua elaborazione locale.
+4. Genera la minuta e controlla l'anteprima testuale.
+5. Usa 'Copia per Outlook' e incolla nel corpo di un'email HTML. La copia
+   usa il formato CF_HTML di Windows con offset UTF-8, oltre al testo semplice.
+6. In alternativa scegli 'Apri HTML', 'Copia testo' o 'Apri cartella'.
+
+La UI non registra ancora audio. La raccolta audio Windows e la trascrizione
+locale sono attività successive e vanno abilitate solo nel rispetto delle
+policy interne per registrazioni e consensi.
+
+### Test eseguiti
+
+- Parser + test PowerShell su dati sintetici, senza chiamate IA reali.
+- Publish self-contained Windows dell'eseguibile su GitHub Actions.
+- Test del formato CF_HTML, inclusi gli offset di caratteri non ASCII.
+- Verifica che il pacchetto includa gli script necessari.
+
+Il comportamento grafico, l'accesso locale ai CLI, l'invio tramite account
+aziendale e l'effettiva incollatura in Outlook richiedono un test interattivo
+sulla postazione Windows dell'utente.
