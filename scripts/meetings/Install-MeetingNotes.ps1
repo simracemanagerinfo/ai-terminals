@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$Destination,
-    [string]$Repository = 'simracemanagerinfo/ai-terminals'
+    [string]$Repository = 'simracemanagerinfo/ai-terminals',
+    [long]$RunId = 0
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -74,14 +75,155 @@ try {
                 'X-GitHub-Api-Version' = '2022-11-28'
             }
             $token = $null
-            $branch = [uri]::EscapeDataString('feature/meeting-notes')
-            $runsUri = "https://api.github.com/repos/$Repository/actions/runs?branch=$branch&status=success&per_page=30"
-            $runs = Invoke-RestMethod -Uri $runsUri -Headers $headers -TimeoutSec 45
-            $latest = @($runs.workflow_runs | Where-Object {
-                $_.conclusion -eq 'success' -and $_.path -match 'meeting-notes-tests\.yml$'
-            } | Sort-Object created_at -Descending | Select-Object -First 1)
-            if ($latest.Count -ne 1) { throw 'Non esiste una build Meeting Notes riuscita.' }
-            $runId = [long]$latest[0].id
+            if ($RunId -gt 0) {
+                # Explicit run selection for CI and controlled rollback/testing.
+                # A run in progress is valid only if its artifact already exists.
+                $selectedRun = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/actions/runs/$RunId" -Headers $headers -TimeoutSec 45
+                if ($selectedRun.head_branch -ne 'feature/meeting-notes' -or
+                    $selectedRun.path -notmatch 'meeting-notes-tests\.yml
+            $index = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/actions/runs/$runId/artifacts?per_page=100" -Headers $headers -TimeoutSec 45
+            $artifact = @($index.artifacts | Where-Object {
+                $_.name -eq 'MeetingNotes-win-x64' -and -not $_.expired
+            } | Select-Object -First 1)
+            if ($artifact.Count -ne 1) { throw "Nessun pacchetto Meeting Notes per la build $runId." }
+            if ([long]$artifact[0].size_in_bytes -le 0 -or [long]$artifact[0].size_in_bytes -gt 512MB) {
+                throw 'Dimensione del pacchetto anomala.'
+            }
+
+            Write-Host "Download build $runId dal branch feature/meeting-notes..." -ForegroundColor Cyan
+            $zipUri = "https://api.github.com/repos/$Repository/actions/artifacts/$($artifact[0].id)/zip"
+            Invoke-WebRequest -Uri $zipUri -Headers $headers -OutFile $archive -TimeoutSec 240 -MaximumRedirection 5 -ErrorAction Stop | Out-Null
+            Expand-Archive -LiteralPath $archive -DestinationPath $staging -Force
+        }
+        finally {
+            $headers = $null
+            $token = $null
+        }
+    }
+    else {
+        Write-Warning 'GitHub CLI/credenziali non disponibili: provo la compilazione locale.'
+        $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+        Publish-Locally -StagingPath $staging -ProjectRoot $root
+    }
+
+    foreach ($required in @(
+        'MeetingNotes.exe',
+        'scripts\Invoke-MeetingMinutes.ps1',
+        'scripts\Invoke-MeetingProvider.ps1',
+        'transcriber\MeetingTranscriber.exe'
+    )) {
+        if (-not (Test-Path -LiteralPath (Join-Path $staging $required) -PathType Leaf)) {
+            throw "Pacchetto incompleto, manca: $required. La versione precedente resta intatta."
+        }
+    }
+    if (Test-Path -LiteralPath $Destination) {
+        if (-not (Test-Path -LiteralPath (Join-Path $Destination 'MeetingNotes.exe') -PathType Leaf)) {
+            throw 'La cartella di destinazione esiste, ma non è una installazione Meeting Notes gestita.'
+        }
+        Rename-Item -LiteralPath $Destination -NewName (Split-Path -Leaf $backup) -ErrorAction Stop
+        $oldMoved = $true
+    }
+    try {
+        Rename-Item -LiteralPath $staging -NewName (Split-Path -Leaf $Destination) -ErrorAction Stop
+        $installed = $true
+        Write-Host "[OK] Meeting Notes installato in: $Destination" -ForegroundColor Green
+    }
+    catch {
+        if ($oldMoved -and -not (Test-Path -LiteralPath $Destination)) {
+            Rename-Item -LiteralPath $backup -NewName (Split-Path -Leaf $Destination)
+            $oldMoved = $false
+        }
+        throw
+    }
+}
+finally {
+    if (Test-Path -LiteralPath $archive) { Remove-Item -LiteralPath $archive -Force -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue }
+    if ($installed -and $oldMoved -and (Test-Path -LiteralPath $backup)) {
+        try { Remove-Item -LiteralPath $backup -Recurse -Force -ErrorAction Stop }
+        catch { Write-Warning "Backup precedente da rimuovere manualmente: $backup" }
+    }
+}
+ -or
+                    $selectedRun.conclusion -eq 'failure') {
+                    throw 'La build specificata non è un workflow valido di Meeting Notes.'
+                }
+                $runId = $RunId
+            }
+            else {
+                $branch = [uri]::EscapeDataString('feature/meeting-notes')
+                $runsUri = "https://api.github.com/repos/$Repository/actions/runs?branch=$branch&status=success&per_page=30"
+                $runs = Invoke-RestMethod -Uri $runsUri -Headers $headers -TimeoutSec 45
+                $latest = @($runs.workflow_runs | Where-Object {
+                    $_.conclusion -eq 'success' -and $_.path -match 'meeting-notes-tests\.yml
+            $index = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/actions/runs/$runId/artifacts?per_page=100" -Headers $headers -TimeoutSec 45
+            $artifact = @($index.artifacts | Where-Object {
+                $_.name -eq 'MeetingNotes-win-x64' -and -not $_.expired
+            } | Select-Object -First 1)
+            if ($artifact.Count -ne 1) { throw "Nessun pacchetto Meeting Notes per la build $runId." }
+            if ([long]$artifact[0].size_in_bytes -le 0 -or [long]$artifact[0].size_in_bytes -gt 512MB) {
+                throw 'Dimensione del pacchetto anomala.'
+            }
+
+            Write-Host "Download build $runId dal branch feature/meeting-notes..." -ForegroundColor Cyan
+            $zipUri = "https://api.github.com/repos/$Repository/actions/artifacts/$($artifact[0].id)/zip"
+            Invoke-WebRequest -Uri $zipUri -Headers $headers -OutFile $archive -TimeoutSec 240 -MaximumRedirection 5 -ErrorAction Stop | Out-Null
+            Expand-Archive -LiteralPath $archive -DestinationPath $staging -Force
+        }
+        finally {
+            $headers = $null
+            $token = $null
+        }
+    }
+    else {
+        Write-Warning 'GitHub CLI/credenziali non disponibili: provo la compilazione locale.'
+        $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+        Publish-Locally -StagingPath $staging -ProjectRoot $root
+    }
+
+    foreach ($required in @(
+        'MeetingNotes.exe',
+        'scripts\Invoke-MeetingMinutes.ps1',
+        'scripts\Invoke-MeetingProvider.ps1',
+        'transcriber\MeetingTranscriber.exe'
+    )) {
+        if (-not (Test-Path -LiteralPath (Join-Path $staging $required) -PathType Leaf)) {
+            throw "Pacchetto incompleto, manca: $required. La versione precedente resta intatta."
+        }
+    }
+    if (Test-Path -LiteralPath $Destination) {
+        if (-not (Test-Path -LiteralPath (Join-Path $Destination 'MeetingNotes.exe') -PathType Leaf)) {
+            throw 'La cartella di destinazione esiste, ma non è una installazione Meeting Notes gestita.'
+        }
+        Rename-Item -LiteralPath $Destination -NewName (Split-Path -Leaf $backup) -ErrorAction Stop
+        $oldMoved = $true
+    }
+    try {
+        Rename-Item -LiteralPath $staging -NewName (Split-Path -Leaf $Destination) -ErrorAction Stop
+        $installed = $true
+        Write-Host "[OK] Meeting Notes installato in: $Destination" -ForegroundColor Green
+    }
+    catch {
+        if ($oldMoved -and -not (Test-Path -LiteralPath $Destination)) {
+            Rename-Item -LiteralPath $backup -NewName (Split-Path -Leaf $Destination)
+            $oldMoved = $false
+        }
+        throw
+    }
+}
+finally {
+    if (Test-Path -LiteralPath $archive) { Remove-Item -LiteralPath $archive -Force -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue }
+    if ($installed -and $oldMoved -and (Test-Path -LiteralPath $backup)) {
+        try { Remove-Item -LiteralPath $backup -Recurse -Force -ErrorAction Stop }
+        catch { Write-Warning "Backup precedente da rimuovere manualmente: $backup" }
+    }
+}
+
+                } | Sort-Object created_at -Descending | Select-Object -First 1)
+                if ($latest.Count -ne 1) { throw 'Non esiste una build Meeting Notes riuscita.' }
+                $runId = [long]$latest[0].id
+            }
             $index = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/actions/runs/$runId/artifacts?per_page=100" -Headers $headers -TimeoutSec 45
             $artifact = @($index.artifacts | Where-Object {
                 $_.name -eq 'MeetingNotes-win-x64' -and -not $_.expired
