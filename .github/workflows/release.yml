@@ -27,7 +27,38 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
 
+      - name: Check whether this version is already published
+        id: publication
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'User-Agent' = 'AI-Terminals-Release'
+          }
+          $exists = $false
+          try {
+            $published = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/v1.1.1" -Headers $headers -TimeoutSec 30
+            if ($published.draft) { throw 'Release v1.1.1 exists as a draft: manual review required' }
+            $exists = $true
+          }
+          catch {
+            if ($null -eq $_.Exception.Response -or
+                [int]$_.Exception.Response.StatusCode -ne 404) { throw }
+          }
+          if ($exists) {
+            Write-Host 'v1.1.1 already published: do not attempt to recreate an existing immutable release.'
+            "exists=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          }
+          else {
+            "exists=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          }
+
       - name: Download Claude Terminal from successful Windows build
+        if: steps.publication.outputs.exists != 'true'
         uses: actions/download-artifact@v4
         with:
           name: ClaudeTerminal-win-x64
@@ -36,6 +67,7 @@ jobs:
           path: packages/ClaudeTerminal
 
       - name: Download Codex Terminal from the same Windows build
+        if: steps.publication.outputs.exists != 'true'
         uses: actions/download-artifact@v4
         with:
           name: CodexTerminal-win-x64
@@ -44,6 +76,7 @@ jobs:
           path: packages/CodexTerminal
 
       - name: Download installer from same successful Windows build
+        if: steps.publication.outputs.exists != 'true'
         uses: actions/download-artifact@v4
         with:
           name: AI-Terminals-Setup
@@ -52,6 +85,7 @@ jobs:
           path: packages/Installer
 
       - name: Verify checked-out release versions
+        if: steps.publication.outputs.exists != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -63,6 +97,7 @@ jobs:
           }
 
       - name: Verify packages and create versioned ZIP and checksums
+        if: steps.publication.outputs.exists != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -107,6 +142,7 @@ jobs:
           $checksums | Set-Content -LiteralPath 'release-assets/SHA256SUMS.txt' -Encoding ascii
 
       - name: Publish stable GitHub Release v1.1.1
+        if: steps.publication.outputs.exists != 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
