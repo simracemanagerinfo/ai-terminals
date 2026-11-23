@@ -119,7 +119,7 @@
                     CornerRadius="8" Padding="12" Margin="0,0,0,18">
               <StackPanel>
                 <TextBlock Text="Prova registrazione audio" FontSize="15" FontWeight="Bold"/>
-                <TextBlock Text="Acquisizione locale in WAV, senza inviare nulla all'IA."
+                <TextBlock Text="Registrazione locale fino a 120 minuti. Controlla lo spazio disco; nessun upload."
                            Foreground="#647887" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,10"/>
                 <WrapPanel Margin="0,0,0,8">
                   <CheckBox x:Name="CaptureMicrophone" Content="Microfono" IsChecked="True" Margin="0,0,18,0"/>
@@ -241,7 +241,7 @@
     <Border Grid.Row="2" Background="White" BorderBrush="#DCE6EA" BorderThickness="0,1,0,0"
             Padding="25,11">
       <DockPanel>
-        <TextBlock Text="v0.3 · Trascrizione offline · WAV → TXT → minuta Outlook"
+        <TextBlock Text="v0.4 · Stili minuta · icona Windows · WAV → TXT → Outlook"
                    DockPanel.Dock="Right" Foreground="#647887" HorizontalAlignment="Right" FontSize="11"/>
         <TextBlock x:Name="StatusText" Text="Pronto · Nessun dato inviato" FontSize="12"
                    Foreground="#176F71" TextTrimming="CharacterEllipsis"/>
