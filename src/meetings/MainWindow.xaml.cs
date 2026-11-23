@@ -570,7 +570,7 @@ public partial class MainWindow : Window
             StopAudioButton.IsEnabled = true;
             OpenAudioFolderButton.IsEnabled = false;
             _audioTimer.Start();
-            AudioStatusText.Text = "● Registrazione locale in corso · 00:00. Nessun upload.";
+            AudioStatusText.Text = "● Registrazione locale in corso · 00:00:00. Nessun upload.";
         }
         catch (Exception ex)
         {
