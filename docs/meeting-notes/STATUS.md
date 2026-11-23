@@ -118,8 +118,29 @@ via GitHub API senza dipendenza da gh.
 Restano da verificare manualmente sul PC aziendale il selettore cartella,
 l'editor e la copia TXT, nonché la cattura audio su dispositivi reali.
 
+## Fase 3b — Trascrizione offline CPU: implementata, test inferenza reale da fare
+
+- Aggiunta app console indipendente src/meetings/transcriber/MeetingTranscriber.csproj,
+  pubblicata nel pacchetto portabile sotto transcriber/MeetingTranscriber.exe.
+- Whisper.net 1.9.1 + Whisper.net.Runtime CPU + NAudio 3.3: nessun servizio
+  esterno durante l'elaborazione. Non serve GPU.
+- Convertitore WAV multicanale/48 kHz -> PCM 16 kHz mono; test self-test
+  con dati audio sintetici senza scaricare modelli.
+- Microfono e audio del PC vengono trascritti separatamente e poi riordinati
+  per timestamp approssimativo. Etichette per sorgente, non vera diarizzazione.
+- GUI: selezione file WAV/cartella, modello GGML multilingua (.bin),
+  "Trascrivi offline", annullamento e TXT nell'editor della cartella di lavoro.
+- Modello ggml-base.bin scaricabile una sola volta con
+  scripts/meetings/Install-WhisperModel.ps1, esecuzione esplicita e controllo SHA256.
+  Il modello non viene committato e non è necessario per la build CI.
+- L'audio e le trascrizioni restano in locale durante lo STT; solo il successivo
+  "Genera minuta" può inviare il TXT al provider Claude/Codex previa conferma.
+- Limiti: qualità da provare con voci italiane su CPU aziendale, modello e
+  runtime VC++ disponibili, differenze di sincronizzazione/eco tra sorgenti;
+  STT non parte automaticamente dopo il pulsante Ferma.
+
 ## Prossime fasi (NON ancora implementate)
-- Trascrizione locale STT dei WAV, da valutare con whisper.cpp e modello approvato.
+- Collaudo su PC aziendale di Whisper CPU con modello reale, accuratezza e prestazioni.
 - Sicurezza avanzata: cifratura, conservazione automatica, gestione consensi.
 - Eventuale packaging, release separata e internazionalizzazione completa.
 
