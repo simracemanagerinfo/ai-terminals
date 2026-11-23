@@ -97,10 +97,18 @@ try {
                 if ($latest.Count -ne 1) { throw 'Non esiste una build Meeting Notes riuscita.' }
                 $runId = [long]$latest[0].id
             }
-            $index = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/actions/runs/$runId/artifacts?per_page=100" -Headers $headers -TimeoutSec 45
-            $artifact = @($index.artifacts | Where-Object {
-                $_.name -eq 'MeetingNotes-win-x64' -and -not $_.expired
-            } | Select-Object -First 1)
+            # L'API artifacts di GitHub può impiegare qualche secondo per indicizzare
+            # un archivio appena caricato da actions/upload-artifact.
+            $attempts = if ($RunId -gt 0) { 20 } else { 1 }
+            $artifact = @()
+            for ($attempt = 1; $attempt -le $attempts; $attempt++) {
+                $index = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/actions/runs/$runId/artifacts?per_page=100" -Headers $headers -TimeoutSec 45
+                $artifact = @($index.artifacts | Where-Object {
+                    $_.name -eq 'MeetingNotes-win-x64' -and -not $_.expired
+                } | Select-Object -First 1)
+                if ($artifact.Count -eq 1) { break }
+                if ($attempt -lt $attempts) { Start-Sleep -Seconds 3 }
+            }
             if ($artifact.Count -ne 1) { throw "Nessun pacchetto Meeting Notes per la build $runId." }
             if ([long]$artifact[0].size_in_bytes -le 0 -or [long]$artifact[0].size_in_bytes -gt 512MB) {
                 throw 'Dimensione del pacchetto anomala.'
