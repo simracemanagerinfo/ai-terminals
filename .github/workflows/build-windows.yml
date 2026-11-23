@@ -68,6 +68,21 @@ jobs:
           $ErrorActionPreference = 'Stop'
           & './tests/InstallerMetadata.Tests.ps1'
 
+      - name: Test published checksums and both public update packages
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & './tests/InstallerChecksum.Tests.ps1'
+          if ($LASTEXITCODE -ne 0) { throw 'Published checksum regression test failed' }
+          & './scripts/Install-AITerminals.ps1' -App Both
+          foreach ($agent in @('Claude','Codex')) {
+            $exe = Join-Path $env:LOCALAPPDATA "PowerShellCustomization/$($agent)Terminal/$($agent)Terminal.exe"
+            if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) {
+              throw "Stable release installer did not install $agent"
+            }
+          }
+          Write-Host '[PASS] Both public ZIPs installed and verified with SHA-256'
+
       - name: Check token statistics and local history
         shell: pwsh
         run: |
