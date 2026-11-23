@@ -22,6 +22,10 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _cancelSource;
     private AudioCaptureSession? _audioCapture;
     private string? _lastAudioFolder;
+    private string? _whisperModel;
+    private Process? _transcribeProcess;
+    private CancellationTokenSource? _transcribeCts;
+    private bool _closingTranscribe;
     private DateTime _audioStartedUtc;
     private readonly DispatcherTimer _audioTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private bool _stoppingAudio;
@@ -33,6 +37,14 @@ public partial class MainWindow : Window
         ProviderInput.SelectedIndex = 0;
         StyleInput.Value = 80;
         WorkspaceInput.Text = _workspaceRoot;
+        var defaultModel = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "AI-Terminals", "MeetingNotes", "Models", "ggml-base.bin");
+        if (File.Exists(defaultModel))
+        {
+            _whisperModel = defaultModel;
+            WhisperModelInput.Text = defaultModel;
+        }
         _audioTimer.Tick += AudioTimer_Tick;
     }
 
@@ -150,6 +162,191 @@ public partial class MainWindow : Window
         }
     }
 
+    private void BrowseModel_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Seleziona un modello Whisper GGML multilingua",
+            Filter = "Modelli GGML (*.bin)|*.bin",
+            CheckFileExists = true
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        if (Path.GetFileName(dialog.FileName).Contains(".en.", StringComparison.OrdinalIgnoreCase))
+        {
+            MessageBox.Show(this, "Seleziona un modello multilingua (es. ggml-base.bin), non .en.",
+                "Modello non adatto all'italiano", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        _whisperModel = dialog.FileName;
+        WhisperModelInput.Text = dialog.FileName;
+        SttStatusText.Text = "Modello selezionato. L'elaborazione sarà effettuata sul PC.";
+    }
+
+    private void BrowseRecording_Click(object sender, RoutedEventArgs e)
+    {
+        var root = WorkspaceStore.Recordings(_workspaceRoot);
+        var dialog = new OpenFileDialog
+        {
+            Title = "Scegli un WAV registrato da Meeting Notes",
+            Filter = "Audio WAV (*.wav)|*.wav",
+            CheckFileExists = true,
+            InitialDirectory = Directory.Exists(root) ? root : _workspaceRoot
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        _lastAudioFolder = Path.GetDirectoryName(dialog.FileName);
+        RecordingInput.Text = _lastAudioFolder ?? dialog.FileName;
+        SttStatusText.Text = "Registrazione selezionata. Se presenti, puoi elaborare entrambe le tracce.";
+    }
+
+    private async void Transcribe_Click(object sender, RoutedEventArgs e)
+    {
+        if (_transcribeCts is not null || _cancelSource is not null || _audioCapture is not null)
+            return;
+
+        if (string.IsNullOrWhiteSpace(_whisperModel) || !File.Exists(_whisperModel))
+        {
+            MessageBox.Show(this,
+                "Seleziona il modello Whisper multilingua ggml-base.bin. Per il download usa lo script Install-WhisperModel.ps1 nel repository.",
+                "Modello offline mancante", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_lastAudioFolder) || !Directory.Exists(_lastAudioFolder))
+        {
+            MessageBox.Show(this, "Prima registra un audio oppure scegli un file WAV.",
+                "Registrazione mancante", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var micPath = Path.Combine(_lastAudioFolder, "microfono.wav");
+        var pcPath = Path.Combine(_lastAudioFolder, "audio-pc.wav");
+        var mic = SttMicrophone.IsChecked == true && File.Exists(micPath) ? micPath : null;
+        var pc = SttSystem.IsChecked == true && File.Exists(pcPath) ? pcPath : null;
+
+        if (mic is null && pc is null)
+        {
+            var wavs = Directory.GetFiles(_lastAudioFolder, "*.wav");
+            if (wavs.Length == 1)
+            {
+                if (SttMicrophone.IsChecked == true) mic = wavs[0];
+                else if (SttSystem.IsChecked == true) pc = wavs[0];
+            }
+        }
+        if (mic is null && pc is null)
+        {
+            MessageBox.Show(this, "Nessuna traccia WAV corrisponde alle sorgenti selezionate.",
+                "Audio non trovato", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var exe = Path.Combine(AppContext.BaseDirectory, "transcriber", "MeetingTranscriber.exe");
+        if (!File.Exists(exe))
+        {
+            MessageBox.Show(this, "Il motore Whisper non è presente nel pacchetto: " + exe,
+                "Motore STT mancante", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        _transcribeCts = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+        TranscribeButton.IsEnabled = false;
+        CancelTranscribeButton.IsEnabled = true;
+        BrowseWorkspaceButton.IsEnabled = false;
+        StartAudioButton.IsEnabled = false;
+        GenerateButton.IsEnabled = false;
+        SttStatusText.Text = "Trascrizione CPU in corso… può richiedere alcuni minuti. Nessun upload.";
+
+        try
+        {
+            using var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = exe,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    StandardOutputEncoding = new UTF8Encoding(false),
+                    StandardErrorEncoding = new UTF8Encoding(false),
+                    WorkingDirectory = Path.GetTempPath()
+                }
+            };
+            var args = process.StartInfo.ArgumentList;
+            args.Add("--model"); args.Add(_whisperModel);
+            args.Add("--output"); args.Add(WorkspaceStore.Transcripts(_workspaceRoot));
+            if (mic is not null) { args.Add("--microphone"); args.Add(mic); }
+            if (pc is not null) { args.Add("--system"); args.Add(pc); }
+
+            if (!process.Start())
+                throw new InvalidOperationException("Impossibile avviare il motore STT.");
+            _transcribeProcess = process;
+            var stdout = process.StandardOutput.ReadToEndAsync();
+            var stderr = process.StandardError.ReadToEndAsync();
+            try
+            {
+                await process.WaitForExitAsync(_transcribeCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                if (!process.HasExited)
+                {
+                    try { process.Kill(entireProcessTree: true); }
+                    catch (InvalidOperationException) { }
+                }
+                await process.WaitForExitAsync();
+                throw;
+            }
+            var resultText = await stdout;
+            _ = await stderr;
+            if (process.ExitCode != 0)
+                throw new InvalidOperationException("Trascrizione non riuscita. Verifica il modello .bin, i WAV e i prerequisiti CPU/VC++.");
+            using var json = JsonDocument.Parse(resultText);
+            var path = json.RootElement.GetProperty("TranscriptPath").GetString();
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                throw new InvalidDataException("Whisper non ha prodotto un file TXT.");
+            var content = await File.ReadAllTextAsync(path, Encoding.UTF8);
+            if (string.IsNullOrWhiteSpace(content))
+                throw new InvalidDataException("Il file di trascrizione è vuoto.");
+            if (Encoding.UTF8.GetByteCount(content) > WorkspaceStore.MaxTranscriptBytes)
+                throw new InvalidDataException("Il testo supera il limite del generatore di minute (2 MiB).");
+
+            TranscriptEditor.Text = content;
+            TranscriptInput.Text = path;
+            _transcriptPath = path;
+            _savedTranscriptText = content;
+            SttStatusText.Text = "Trascrizione completata e salvata in trascrizioni. Controlla il testo prima di generare la minuta.";
+            StatusText.Text = "TXT offline pronto. Per la minuta puoi scegliere Claude o Codex.";
+        }
+        catch (OperationCanceledException)
+        {
+            SttStatusText.Text = "Trascrizione annullata. Nessun dato inviato fuori dal PC.";
+        }
+        catch (Exception ex)
+        {
+            SttStatusText.Text = "Trascrizione non riuscita.";
+            MessageBox.Show(this, ex.Message, "Whisper offline",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            _transcribeProcess = null;
+            _transcribeCts?.Dispose();
+            _transcribeCts = null;
+            TranscribeButton.IsEnabled = true;
+            CancelTranscribeButton.IsEnabled = false;
+            BrowseWorkspaceButton.IsEnabled = _cancelSource is null && _audioCapture is null;
+            StartAudioButton.IsEnabled = _audioCapture is null;
+            GenerateButton.IsEnabled = _cancelSource is null;
+            if (_closingTranscribe)
+                Close();
+        }
+    }
+
+    private void CancelTranscribe_Click(object sender, RoutedEventArgs e)
+    {
+        SttStatusText.Text = "Annullamento trascrizione in corso…";
+        _transcribeCts?.Cancel();
+    }
+
     private void BrowseMock_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog
@@ -182,8 +379,9 @@ public partial class MainWindow : Window
 
     private void SetBusy(bool busy)
     {
-        GenerateButton.IsEnabled = !busy;
+        GenerateButton.IsEnabled = !busy && _transcribeCts is null;
         CancelButton.IsEnabled = busy;
+        TranscribeButton.IsEnabled = !busy && _transcribeCts is null;
         ProviderInput.IsEnabled = !busy;
         BrowseWorkspaceButton.IsEnabled = !busy && _audioCapture is null;
         SaveTranscriptButton.IsEnabled = !busy;
@@ -192,6 +390,8 @@ public partial class MainWindow : Window
 
     private async void Generate_Click(object sender, RoutedEventArgs e)
     {
+        if (_transcribeCts is not null)
+            return;
         if (string.IsNullOrWhiteSpace(TranscriptEditor.Text))
         {
             MessageBox.Show(this, "Importa o scrivi una trascrizione prima di generare la minuta.", "Meeting Notes",
@@ -334,7 +534,7 @@ public partial class MainWindow : Window
 
     private void StartAudio_Click(object sender, RoutedEventArgs e)
     {
-        if (_audioCapture is not null)
+        if (_audioCapture is not null || _transcribeCts is not null)
             return;
         if (RecordingPermission.IsChecked != true)
         {
@@ -407,6 +607,7 @@ public partial class MainWindow : Window
             var result = await session.StopAsync();
             _lastAudioFolder = result.Folder;
             OpenAudioFolderButton.IsEnabled = true;
+            RecordingInput.Text = _lastAudioFolder ?? "Registrazione completata";
             AudioStatusText.Text = result.CapturedBytes > 0
                 ? "Registrazione salvata. Apri i file WAV per ascoltare entrambe le sorgenti."
                 : "Registrazione terminata senza campioni audio. Verifica dispositivi e volume.";
@@ -442,6 +643,13 @@ public partial class MainWindow : Window
 
     protected override async void OnClosing(CancelEventArgs e)
     {
+        if (_transcribeCts is not null)
+        {
+            e.Cancel = true;
+            _closingTranscribe = true;
+            _transcribeCts.Cancel();
+            return;
+        }
         if (_audioCapture is not null)
         {
             e.Cancel = true;
@@ -511,6 +719,12 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _cancelSource?.Cancel();
+        _transcribeCts?.Cancel();
+        if (_transcribeProcess is { HasExited: false })
+        {
+            try { _transcribeProcess.Kill(entireProcessTree: true); }
+            catch (InvalidOperationException) { }
+        }
         if (_activeProcess is { HasExited: false })
         {
             try { _activeProcess.Kill(entireProcessTree: true); }
