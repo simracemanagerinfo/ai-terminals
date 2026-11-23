@@ -107,6 +107,17 @@ aziendale. Non dichiarare completo il collaudo E2E prima di questi riscontri.
 - La trascrizione automatica WAV → TXT NON è ancora implementata; il testo
   salvato tramite editor è inserito/importato manualmente.
 
+### Test della cartella di lavoro
+
+GitHub Actions Windows: PASS, run 45137832801.
+https://github.com/simracemanagerinfo/ai-terminals/actions/runs/45137832801
+
+Verificati: compilazione WPF autonoma, test PowerShell e mock, formattazione
+per Outlook, test TXT UTF-8/cartelle/nome univoco/blocco Git e download installer
+via GitHub API senza dipendenza da gh.
+Restano da verificare manualmente sul PC aziendale il selettore cartella,
+l'editor e la copia TXT, nonché la cattura audio su dispositivi reali.
+
 ## Prossime fasi (NON ancora implementate)
 - Trascrizione locale STT dei WAV, da valutare con whisper.cpp e modello approvato.
 - Sicurezza avanzata: cifratura, conservazione automatica, gestione consensi.
