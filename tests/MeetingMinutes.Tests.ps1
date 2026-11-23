@@ -59,6 +59,10 @@ try {
     Require (-not $html.Contains('<script')) 'JavaScript non consentito nell email'
     Require (-not $html.Contains('http://')) 'L email non deve richiamare contenuti esterni'
     Require (-not $html.Contains('https://')) 'L email non deve richiamare contenuti esterni'
+    $structured = & $runner @args -AsJson | ConvertFrom-Json
+    Require ([bool]$structured.HtmlPath) 'AsJson non ha fornito il percorso HTML'
+    Require ([bool]$structured.TextPath) 'AsJson non ha fornito il percorso TXT'
+    Require (Test-Path -LiteralPath $structured.HtmlPath) 'Percorso AsJson non esistente'
     $second = & $runner @args
     Require ($result.HtmlPath -ne $second.HtmlPath) 'La seconda esecuzione ha sovrascritto la prima'
 
