@@ -7,7 +7,8 @@ param(
     [string]$MeetingTitle = 'Riunione',
     [ValidateRange(30,1800)][int]$TimeoutSeconds = 300,
     [string]$MockResponsePath,
-    [switch]$AllowExternalProcessing
+    [switch]$AllowExternalProcessing,
+    [switch]$AsJson
 )
 
 Set-StrictMode -Version Latest
@@ -281,4 +282,10 @@ $textPath = Join-Path $folder 'minutes.txt'
 [IO.File]::WriteAllText($htmlPath, ($h -join [Environment]::NewLine), [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText($jsonPath, ($data | ConvertTo-Json -Depth 25), [Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText($textPath, ($plain -join [Environment]::NewLine), [Text.UTF8Encoding]::new($false))
-[pscustomobject]@{ HtmlPath = $htmlPath; JsonPath = $jsonPath; TextPath = $textPath; Provider = $Provider; Items = ($decisions.Count + $actions.Count) }
+$result = [pscustomobject]@{ HtmlPath = $htmlPath; JsonPath = $jsonPath; TextPath = $textPath; Provider = $Provider; Items = ($decisions.Count + $actions.Count) }
+if ($AsJson) {
+    $result | ConvertTo-Json -Compress
+}
+else {
+    $result
+}
