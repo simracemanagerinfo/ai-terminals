@@ -21,11 +21,14 @@ internal sealed class MonoSampleProvider : ISampleProvider
     public WaveFormat WaveFormat { get; }
 
     public int Read(float[] buffer, int offset, int count)
+        => Read(buffer.AsSpan(offset, count));
+
+    public int Read(Span<float> buffer)
     {
-        if (count == 0) return 0;
-        var needed = checked(count * _channels);
+        if (buffer.Length == 0) return 0;
+        var needed = checked(buffer.Length * _channels);
         if (_buffer.Length < needed) _buffer = new float[needed];
-        var read = _source.Read(_buffer, 0, needed);
+        var read = _source.Read(_buffer.AsSpan(0, needed));
         var frames = read / _channels;
         for (var i = 0; i < frames; i++)
         {
@@ -33,7 +36,7 @@ internal sealed class MonoSampleProvider : ISampleProvider
             var baseOffset = i * _channels;
             for (var c = 0; c < _channels; c++)
                 sum += _buffer[baseOffset + c];
-            buffer[offset + i] = (float)(sum / _channels);
+            buffer[i] = (float)(sum / _channels);
         }
         return frames;
     }
