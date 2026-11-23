@@ -325,3 +325,47 @@ Il limite di registrazione per collaudo è stato portato da 10 a
 I WAV non compressi possono occupare molti gigabyte: verifica lo spazio
 libero e interrompi manualmente quando la riunione termina. La trascrizione
 offline è avviata separatamente, dopo aver salvato i WAV.
+
+
+## Fase 5 — Trascrizione automatica e pulizia sicura audio
+
+Quando la registrazione termina normalmente (tasto **Ferma** o limite di durata),
+l'app finalizza i WAV e **avvia automaticamente Whisper offline** sulle tracce
+effettivamente registrate, senza richiedere "Trascrivi offline".
+
+Nella sezione **Impostazioni** è disponibile:
+- **Mantieni file audio originale**: disattivato per default.
+  L'impostazione resta salvata per gli avvii successivi nel file locale
+  %LOCALAPPDATA%\AI-Terminals\MeetingNotes\recording-preferences.json.
+- Se la casella è disattivata, la nuova registrazione è eliminata soltanto
+  DOPO che Whisper termina senza errori e il TXT viene salvato,
+  risulta non vuoto e contiene segmenti riconosciuti.
+- Se la casella è attivata, microfono.wav e audio-pc.wav restano nella cartella.
+- La scelta è fissata all'inizio della singola registrazione.
+
+**Protezioni dalla perdita di dati:**
+- Modello mancante, file WAV vuoto, errore Whisper, TXT vuoto,
+  timeout, annullamento, chiusura forzata o problema di scrittura:
+  i WAV vengono conservati per un nuovo tentativo.
+- Sono ammissibili alla cancellazione automatica SOLO i WAV della sessione
+  appena terminata, con i nomi noti e collocati direttamente in
+  registrazioni/rec-.../. Non vengono eliminati file importati manualmente,
+  registrazioni precedenti o file aggiuntivi presenti nella cartella.
+- La trascrizione avviata manualmente da "Trascrivi offline" non elimina mai
+  il WAV di origine. È il percorso di recupero per le registrazioni conservate.
+- Se la pulizia fallisce per file in uso, permessi o percorso inatteso,
+  l'app segnala che il TXT è stato salvato e non considera riuscita la pulizia.
+- **Non viene mai avviata automaticamente la generazione di minute Claude/Codex**:
+  l'utente deve correggere il TXT e autorizzare esplicitamente l'invio.
+
+Per la prima prova non utilizzare dati riservati: acquisire una breve
+registrazione, premere Ferma e verificare la creazione del TXT.
+Se "Mantieni file audio originale" è disattivato, i WAV di quella
+sessione devono scomparire. Ripetere con la casella selezionata e verificare
+che restino presenti. Provare anche un arresto di Whisper con
+"Annulla trascrizione": i WAV devono essere conservati.
+
+Questi comportamenti sono verificati automaticamente con unit/smoke test
+sintetici per impostazioni, TXT, limiti dei percorsi e cancellazione.
+La sincronizzazione con il dispositivo audio fisico richiede comunque
+un collaudo Windows interattivo.
