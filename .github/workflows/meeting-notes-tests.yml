@@ -95,7 +95,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          & './scripts/meetings/Install-MeetingNotes.ps1' -Destination "$env:GITHUB_WORKSPACE/out/MeetingNotesInstallerSmoke"
+          & './scripts/meetings/Install-MeetingNotes.ps1' -Destination "$env:GITHUB_WORKSPACE/out/MeetingNotesInstallerSmoke" -RunId ([long]$env:GITHUB_RUN_ID)
           if (-not (Test-Path -LiteralPath 'out/MeetingNotesInstallerSmoke/MeetingNotes.exe' -PathType Leaf)) {
             throw 'Installer did not restore MeetingNotes.exe'
           }
