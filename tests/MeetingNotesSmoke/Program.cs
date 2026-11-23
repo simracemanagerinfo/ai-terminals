@@ -72,3 +72,94 @@ finally
     if (Directory.Exists(tmp))
         Directory.Delete(tmp, recursive: true);
 }
+
+
+// Retention tests: WAVs may only be removed after a saved, nonempty TXT.
+// No real meeting data, network calls or audio devices are involved.
+var retentionRoot = Path.Combine(Path.GetTempPath(), "meeting-retention-tests-" + Guid.NewGuid().ToString("N"));
+try
+{
+    WorkspaceStore.EnsureFolders(retentionRoot);
+    var preferences = Path.Combine(retentionRoot, "preferences.json");
+    if (RecordingPreferenceStore.Load(preferences).KeepOriginalAudio)
+        throw new InvalidOperationException("Audio retention default must be disabled.");
+
+    RecordingPreferenceStore.Save(new RecordingPreferences(true), preferences);
+    if (!RecordingPreferenceStore.Load(preferences).KeepOriginalAudio)
+        throw new InvalidOperationException("Keep original WAV preference was not persisted.");
+
+    RecordingPreferenceStore.Save(new RecordingPreferences(false), preferences);
+    if (RecordingPreferenceStore.Load(preferences).KeepOriginalAudio)
+        throw new InvalidOperationException("Disabled preference was not persisted.");
+    File.WriteAllText(preferences, "{not-json");
+    if (RecordingPreferenceStore.Load(preferences).KeepOriginalAudio)
+        throw new InvalidOperationException("Corrupted settings must fall back to disabled.");
+
+    var recordingFolder = Path.Combine(WorkspaceStore.Recordings(retentionRoot), "rec-test-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(recordingFolder);
+    var mic = Path.Combine(recordingFolder, "microfono.wav");
+    var pc = Path.Combine(recordingFolder, "audio-pc.wav");
+    File.WriteAllBytes(mic, new byte[] { 82, 73, 70, 70, 1, 2 });
+    File.WriteAllBytes(pc, new byte[] { 82, 73, 70, 70, 3, 4 });
+    var other = Path.Combine(recordingFolder, "unrelated.txt");
+    File.WriteAllText(other, "This should never be deleted.");
+    var transcript = Path.Combine(WorkspaceStore.Transcripts(retentionRoot), "trascrizione.txt");
+    var paths = new string?[] { mic, pc };
+
+    var refusedMissing = false;
+    try
+    {
+        RecordingAudioRetention.DeleteAfterSuccessfulTranscript(
+            WorkspaceStore.Recordings(retentionRoot), recordingFolder, paths,
+            WorkspaceStore.Transcripts(retentionRoot), transcript, false);
+    }
+    catch (InvalidOperationException) { refusedMissing = true; }
+    if (!refusedMissing || !File.Exists(mic) || !File.Exists(pc))
+        throw new InvalidOperationException("WAVs were not preserved after missing transcript.");
+
+    File.WriteAllText(transcript, "");
+    var refusedEmpty = false;
+    try
+    {
+        RecordingAudioRetention.DeleteAfterSuccessfulTranscript(
+            WorkspaceStore.Recordings(retentionRoot), recordingFolder, paths,
+            WorkspaceStore.Transcripts(retentionRoot), transcript, false);
+    }
+    catch (InvalidOperationException) { refusedEmpty = true; }
+    if (!refusedEmpty || !File.Exists(mic))
+        throw new InvalidOperationException("WAVs were not preserved after empty transcript.");
+
+    File.WriteAllText(transcript, "[00:00:01] [MICROFONO] Questa è una prova.");
+    var kept = RecordingAudioRetention.DeleteAfterSuccessfulTranscript(
+        WorkspaceStore.Recordings(retentionRoot), recordingFolder, paths,
+        WorkspaceStore.Transcripts(retentionRoot), transcript, true);
+    if (kept != 0 || !File.Exists(mic) || !File.Exists(pc))
+        throw new InvalidOperationException("Keep original audio option ignored.");
+
+    var foreign = Path.Combine(retentionRoot, "external.wav");
+    File.WriteAllBytes(foreign, new byte[] { 1, 2, 3 });
+    var refusedForeign = false;
+    try
+    {
+        RecordingAudioRetention.DeleteAfterSuccessfulTranscript(
+            WorkspaceStore.Recordings(retentionRoot), recordingFolder, new string?[] { mic, foreign },
+            WorkspaceStore.Transcripts(retentionRoot), transcript, false);
+    }
+    catch (InvalidOperationException) { refusedForeign = true; }
+    if (!refusedForeign || !File.Exists(mic) || !File.Exists(pc) || !File.Exists(foreign))
+        throw new InvalidOperationException("External WAV safety gate failed.");
+
+    var deleted = RecordingAudioRetention.DeleteAfterSuccessfulTranscript(
+        WorkspaceStore.Recordings(retentionRoot), recordingFolder, paths,
+        WorkspaceStore.Transcripts(retentionRoot), transcript, false);
+    if (deleted != 2 || File.Exists(mic) || File.Exists(pc) ||
+        !File.Exists(transcript) || !File.Exists(other) || !Directory.Exists(recordingFolder))
+        throw new InvalidOperationException("Successful transcript did not trigger scoped WAV cleanup.");
+
+    Console.WriteLine("[PASS] Default-off audio retention, settings persistence, missing/empty TXT safety, import protection and cleanup.");
+}
+finally
+{
+    if (Directory.Exists(retentionRoot))
+        Directory.Delete(retentionRoot, recursive: true);
+}
