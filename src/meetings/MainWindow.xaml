@@ -14,7 +14,7 @@
     </Grid.RowDefinitions>
     <Border Grid.Row="0" Background="White" BorderBrush="#DCE6EA" BorderThickness="0,0,0,1" Padding="26,19">
       <StackPanel>
-        <TextBlock Text="MEETING NOTES" Foreground="#176F71" FontWeight="Bold" FontSize="11" CharacterSpacing="2"/>
+        <TextBlock Text="MEETING NOTES" Foreground="#176F71" FontWeight="Bold" FontSize="11"/>
         <TextBlock Text="Dalla trascrizione alla minuta pronta per Outlook" FontWeight="SemiBold" FontSize="21" Margin="0,5,0,0"/>
         <TextBlock Text="Tutto il flusso locale fino alla chiamata IA. Nessun bot nelle riunioni."
                    Foreground="#647887" Margin="0,4,0,0"/>
@@ -46,7 +46,7 @@
               </Grid.ColumnDefinitions>
               <TextBox x:Name="TranscriptInput" Grid.Column="0" IsReadOnly="True"
                        Text="Nessun file selezionato" VerticalContentAlignment="Center"
-                       TextTrimming="None"/>
+/>
               <Button Grid.Column="1" Margin="7,0,0,0" Content="Sfoglia..." Click="BrowseTranscript_Click"/>
             </Grid>
 
