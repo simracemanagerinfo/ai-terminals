@@ -1,4 +1,6 @@
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Windows.Threading;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -16,6 +18,12 @@ public partial class MainWindow : Window
     private string? _textPath;
     private Process? _activeProcess;
     private CancellationTokenSource? _cancelSource;
+    private AudioCaptureSession? _audioCapture;
+    private string? _lastAudioFolder;
+    private DateTime _audioStartedUtc;
+    private readonly DispatcherTimer _audioTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private bool _stoppingAudio;
+    private bool _closingAudio;
 
     private static string OutputDirectory =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -26,6 +34,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         ProviderInput.SelectedIndex = 0;
         StyleInput.Value = 80;
+        _audioTimer.Tick += AudioTimer_Tick;
     }
 
     private string Provider =>
@@ -215,6 +224,127 @@ public partial class MainWindow : Window
             _cancelSource = null;
             SetBusy(false);
         }
+    }
+
+    private void StartAudio_Click(object sender, RoutedEventArgs e)
+    {
+        if (_audioCapture is not null)
+            return;
+        if (RecordingPermission.IsChecked != true)
+        {
+            MessageBox.Show(this,
+                "Conferma prima che la registrazione di questa prova sia consentita dalle policy aziendali.",
+                "Registrazione audio", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        var mic = CaptureMicrophone.IsChecked == true;
+        var system = CaptureSystem.IsChecked == true;
+        if (!mic && !system)
+        {
+            MessageBox.Show(this, "Scegli microfono, audio del PC o entrambi.",
+                "Registrazione audio", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        try
+        {
+            var root = Path.Combine(OutputDirectory, "recordings");
+            _audioCapture = AudioCaptureSession.Start(root, mic, system);
+            _lastAudioFolder = _audioCapture.Folder;
+            _audioStartedUtc = DateTime.UtcNow;
+            CaptureMicrophone.IsEnabled = false;
+            CaptureSystem.IsEnabled = false;
+            StartAudioButton.IsEnabled = false;
+            StopAudioButton.IsEnabled = true;
+            OpenAudioFolderButton.IsEnabled = false;
+            _audioTimer.Start();
+            AudioStatusText.Text = "● Registrazione locale in corso · 00:00. Nessun upload.";
+        }
+        catch (Exception ex)
+        {
+            AudioStatusText.Text = "Avvio audio non riuscito";
+            MessageBox.Show(this, ex.Message, "Dispositivo audio non disponibile",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void AudioTimer_Tick(object? sender, EventArgs e)
+    {
+        if (_audioCapture is null || _stoppingAudio)
+            return;
+        var elapsed = DateTime.UtcNow - _audioStartedUtc;
+        if (elapsed >= TimeSpan.FromMinutes(10))
+        {
+            _ = StopAudioAsync();
+            return;
+        }
+        AudioStatusText.Text = "● Registrazione locale in corso · " +
+            elapsed.ToString(@"mm\:ss") + ". Nessun upload.";
+    }
+
+    private async void StopAudio_Click(object sender, RoutedEventArgs e)
+    {
+        await StopAudioAsync();
+    }
+
+    private async Task StopAudioAsync()
+    {
+        if (_audioCapture is null || _stoppingAudio)
+            return;
+        _stoppingAudio = true;
+        var session = _audioCapture;
+        _audioTimer.Stop();
+        StopAudioButton.IsEnabled = false;
+        AudioStatusText.Text = "Finalizzazione dei file WAV…";
+        try
+        {
+            var result = await session.StopAsync();
+            _lastAudioFolder = result.Folder;
+            OpenAudioFolderButton.IsEnabled = true;
+            AudioStatusText.Text = result.CapturedBytes > 0
+                ? "Registrazione salvata. Apri i file WAV per ascoltare entrambe le sorgenti."
+                : "Registrazione terminata senza campioni audio. Verifica dispositivi e volume.";
+        }
+        catch (Exception ex)
+        {
+            AudioStatusText.Text = "Registrazione interrotta: verificare i file audio locali.";
+            MessageBox.Show(this, ex.Message, "Registrazione audio",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+            OpenAudioFolderButton.IsEnabled = _lastAudioFolder is not null &&
+                Directory.Exists(_lastAudioFolder);
+        }
+        finally
+        {
+            _audioCapture = null;
+            _stoppingAudio = false;
+            CaptureMicrophone.IsEnabled = true;
+            CaptureSystem.IsEnabled = true;
+            StartAudioButton.IsEnabled = true;
+            RecordingPermission.IsChecked = false;
+        }
+    }
+
+    private void OpenAudioFolder_Click(object sender, RoutedEventArgs e)
+    {
+        if (_lastAudioFolder is not null && Directory.Exists(_lastAudioFolder))
+            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{_lastAudioFolder}\"")
+            {
+                UseShellExecute = true
+            });
+    }
+
+    protected override async void OnClosing(CancelEventArgs e)
+    {
+        if (_audioCapture is not null)
+        {
+            e.Cancel = true;
+            if (_closingAudio)
+                return;
+            _closingAudio = true;
+            await StopAudioAsync();
+            Close();
+            return;
+        }
+        base.OnClosing(e);
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
