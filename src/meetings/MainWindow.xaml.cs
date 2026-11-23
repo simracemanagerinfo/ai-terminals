@@ -35,6 +35,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         ProviderInput.SelectedIndex = 0;
+        MinutesStyleInput.SelectedIndex = 1;
         StyleInput.Value = 80;
         WorkspaceInput.Text = _workspaceRoot;
         var defaultModel = Path.Combine(
@@ -50,6 +51,9 @@ public partial class MainWindow : Window
 
     private string Provider =>
         (ProviderInput.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Claude";
+
+    private string MinutesStyle =>
+        (MinutesStyleInput.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Bilanciato";
 
     private void BrowseWorkspace_Click(object sender, RoutedEventArgs e)
     {
@@ -383,6 +387,7 @@ public partial class MainWindow : Window
         CancelButton.IsEnabled = busy;
         TranscribeButton.IsEnabled = !busy && _transcribeCts is null;
         ProviderInput.IsEnabled = !busy;
+        MinutesStyleInput.IsEnabled = !busy;
         BrowseWorkspaceButton.IsEnabled = !busy && _audioCapture is null;
         SaveTranscriptButton.IsEnabled = !busy;
         NewTranscriptButton.IsEnabled = !busy;
@@ -457,6 +462,7 @@ public partial class MainWindow : Window
                 "-OutputDirectory", WorkspaceStore.Minutes(_workspaceRoot),
                 "-Provider", Provider,
                 "-MeetingTitle", TitleInput.Text,
+                "-MinutesStyle", MinutesStyle,
                 "-StyleLevel", ((int)StyleInput.Value).ToString(System.Globalization.CultureInfo.InvariantCulture),
                 "-AsJson"
             })
