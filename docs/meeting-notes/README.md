@@ -200,3 +200,77 @@ La trascrizione offline (Whisper o alternativa) resta nel prossimo step.
 Il comportamento grafico, l'accesso locale ai CLI, l'invio tramite account
 aziendale e l'effettiva incollatura in Outlook richiedono un test interattivo
 sulla postazione Windows dell'utente.
+
+
+## Fase 3b — Trascrizione offline di WAV
+
+L'app include un processo indipendente MeetingTranscriber.exe che usa
+Whisper.net 1.9.1 e il runtime CPU di whisper.cpp.
+
+La conversione avviene **interamente in locale**. Il download del modello
+Whisper è una **operazione separata ed esplicita**, che usa Internet una
+sola volta. L'app non effettua download impliciti.
+
+### Primo download del modello multilingua
+
+Da PowerShell, da qualunque cartella:
+
+~~~powershell
+$project = 'C:\Users\Overdata\Documents\workspace\personale\ai-terminals-voice'
+pwsh -NoProfile -File "$project\scripts\meetings\Install-WhisperModel.ps1"
+~~~
+
+Scarica ggml-base.bin (~148 MB) dal repository Hugging Face di ggerganov,
+e verifica il SHA-256 prima di conservarlo in
+%LOCALAPPDATA%\AI-Terminals\MeetingNotes\Models\ggml-base.bin.
+
+Hash atteso:
+60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe
+
+Se il download è bloccato dalle policy aziendali, è possibile scegliere
+manualmente un modello Whisper multilingua GGML .bin già disponibile in
+locale (e autorizzato). Non usare varianti *.en.bin, dedicate all'inglese.
+
+### Prova WAV -> TXT
+
+1. Chiudere MeetingNotes.exe e fare pull del branch.
+2. Installare l'ultimo eseguibile con Install-MeetingNotes.ps1.
+3. Nella nuova sezione "Trascrizione offline · Whisper" scegliere il
+   modello ggml-base.bin (la cartella predefinita è riconosciuta automaticamente).
+4. Usare i WAV appena registrati oppure selezionare un WAV con "Sfoglia WAV".
+5. Scegliere Microfono, Audio del PC, o entrambe le tracce e premere
+   "Trascrivi offline".
+6. Il processo separato normalizza i WAV a PCM mono 16 kHz prima del
+   riconoscimento vocale, senza salvare file audio normalizzati permanenti.
+7. La trascrizione viene scritta in un TXT UTF-8 nella sottocartella
+   "trascrizioni" della cartella di lavoro e aperta nell'editor TXT.
+8. Correggere il contenuto e solo poi scegliere "Genera minuta" con un CLI
+   autorizzato. La chiamata al CLI può inviare il testo all'esterno;
+   la trascrizione offline, invece, no.
+
+Quando sono disponibili entrambe le tracce, la trascrizione le elabora
+separatamente e riordina i segmenti per timestamp. Le etichette
+[MICROFONO] e [AUDIO PC] indicano la sorgente, non identificano i
+singoli partecipanti. Non è implementata la diarizzazione vera.
+I timestamp tra le due sorgenti sono approssimati e il microfono può
+captare anche l'audio degli altoparlanti, producendo duplicazioni.
+La velocità dipende dalla CPU e dalla dimensione del modello.
+
+Per CPU x64: Whisper.net.Runtime richiede Windows 11 e il runtime
+Microsoft Visual C++ Redistributable 2022 x64 già presente nel sistema,
+oltre alle istruzioni AVX/AVX2/FMA/F16C. In caso di dipendenze mancanti,
+l'app segnalerà un errore. Non tentare di aggirare i controlli del PC aziendale.
+Se la CPU non supporta AVX, si valuterà un runtime NoAVX separato.
+
+### Test automatici e limiti
+
+GitHub Actions pubblica MeetingNotes.exe e MeetingTranscriber.exe
+in sottocartelle separate dell'artefatto MeetingNotes-win-x64.
+Un self-test STT verifica la conversione WAV 48 kHz stereo -> 16 kHz
+mono senza dover scaricare un modello né usare dati reali.
+L'inferenza Whisper con il modello e l'hardware aziendale richiede
+un collaudo sul computer dell'utente.
+
+La trascrizione NON parte automaticamente con la registrazione:
+si avvia con il pulsante "Trascrivi offline", così l'utente può
+verificare le tracce e scegliere quali trattare.
