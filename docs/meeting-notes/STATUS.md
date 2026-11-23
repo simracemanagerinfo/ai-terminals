@@ -149,6 +149,29 @@ l'editor e la copia TXT, nonché la cattura audio su dispositivi reali.
 - Artefatto: MeetingNotes-win-x64, contenente MeetingTranscriber.exe.
 - **Non testata in CI l'inferenza con modello reale né l'accuratezza su audio italiano**:
   primo collaudo necessario sul PC aziendale dell'utente.
+## Fase 4 — Stile Outlook, icona e collaudi lunghi (2026-11-23)
+
+- Stile di minuta selezionabile: Discorsivo, Bilanciato (predefinito),
+  Sintetico. Separato dal parametro 80% per l'italiano tecnico controllato.
+- Prompt Claude/Codex e layout HTML/TXT allineati alla scelta:
+  paragrafi per Bilanciato/Discorsivo, punti per Sintetico, tabella attività
+  e questioni aperte preservate. Lo stesso JSON mock è usato nei test.
+- Icona Windows generata durante dotnet publish da script PowerShell,
+  incorporata nell'eseguibile e caricata dalla finestra WPF.
+- Installer crea collegamento Meeting Notes nel menu Start dell'utente
+  corrente, senza elevazione; permette pinning manuale sulla taskbar.
+- Limite di registrazione portato da 10 a 120 minuti; indicatore hh:mm:ss.
+  WAV non compresso: controllare spazio su disco e capienza per file.
+- Condivisione schermo Teams: non comanda lo stop della registrazione;
+  eventuali cambi di endpoint/routing audio possono però causare
+  silenzio o disconnessioni. Test live inizio/fine condivisione ancora
+  da fare sul dispositivo dell'utente.
+
+CI Windows: 45165426726 PASS; inclusi parsing PowerShell, casi di rendering
+dei tre stili, compilazione e verifica icona incorporata, Whisper CPU,
+formato appunti Outlook e installer senza GitHub CLI.
+https://github.com/simracemanagerinfo/ai-terminals/actions/runs/45165426726
+
 ## Prossime fasi (NON ancora implementate)
 - Collaudo su PC aziendale di Whisper CPU con modello reale, accuratezza e prestazioni.
 - Sicurezza avanzata: cifratura, conservazione automatica, gestione consensi.
