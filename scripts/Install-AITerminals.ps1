@@ -50,6 +50,25 @@ function Use-GitHubAuthentication {
 }
 if ($RunId -gt 0) { Use-GitHubAuthentication }
 
+# A GitHub Release asset uses "size"; an Actions artifact uses
+# "size_in_bytes". Keep both strict and test the two API contracts.
+function Get-InstallerArtifactSize {
+    param(
+        [Parameter(Mandatory)][object]$Artifact,
+        [Parameter(Mandatory)][bool]$FromRelease
+    )
+    $propertyName = if ($FromRelease) { 'size' } else { 'size_in_bytes' }
+    $sizeProperty = $Artifact.PSObject.Properties[$propertyName]
+    if ($null -eq $sizeProperty -or $null -eq $sizeProperty.Value) {
+        throw "Dimensione pacchetto GitHub non disponibile ($propertyName)."
+    }
+    $bytes = [long]$sizeProperty.Value
+    if ($bytes -le 0 -or $bytes -gt 512MB) {
+        throw "Dimensione anomala del pacchetto ($bytes byte). Operazione annullata."
+    }
+    return $bytes
+}
+
 function Select-Build {
     if ($RunId -gt 0) {
         $selected = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/actions/runs/$RunId" -Headers $headers -TimeoutSec 45
@@ -117,18 +136,7 @@ foreach ($agent in $apps) {
             throw "Artifact non disponibile: $artifactName, run $($run.id)"
         }
     }
-    # GitHub exposes different size fields for Release assets and Actions artifacts:
-    # releases.assets[].size (bytes) vs actions.artifacts[].size_in_bytes.
-    # With StrictMode enabled, reading the wrong property terminates the script.
-    $artifactSize = if ($null -ne $release) {
-        [long]$artifact[0].size
-    }
-    else {
-        [long]$artifact[0].size_in_bytes
-    }
-    if ($artifactSize -le 0 -or $artifactSize -gt 512MB) {
-        throw "Dimensione anomala per $artifactName ($artifactSize byte). Operazione annullata."
-    }
+    $artifactSize = Get-InstallerArtifactSize -Artifact $artifact[0] -FromRelease ($null -ne $release)
     if (Get-Process -Name "${agent}Terminal" -ErrorAction SilentlyContinue) {
         throw "Chiudi $exeName prima di aggiornarlo: i processi attivi non vengono terminati automaticamente."
     }
