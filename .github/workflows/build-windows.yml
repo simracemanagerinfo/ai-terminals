@@ -62,6 +62,12 @@ jobs:
           }
           Write-Host '[PASS] PowerShell installers and launchers parse successfully'
 
+      - name: Validate stable-release and preview artifact metadata
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & './tests/InstallerMetadata.Tests.ps1'
+
       - name: Check token statistics and local history
         shell: pwsh
         run: |
