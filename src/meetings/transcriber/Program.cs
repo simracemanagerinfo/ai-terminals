@@ -11,11 +11,13 @@ namespace MeetingTranscriber;
 internal static class Program
 {
     private sealed record Segment(TimeSpan Start, string Speaker, string Text);
+    private static string _stage = "inizializzazione";
 
     private static async Task<int> Main(string[] args)
     {
         try
         {
+            _stage = "argomenti e configurazione";
             var settings = Parse(args);
             if (settings.ContainsKey("self-test"))
             {
@@ -39,6 +41,7 @@ internal static class Program
             if (Path.GetFileName(model).Contains(".en.", StringComparison.OrdinalIgnoreCase))
                 throw new ArgumentException("Serve un modello Whisper multilingua, non .en per il testo italiano.");
 
+            _stage = "verifica dei file WAV";
             foreach (var (path, _) in audioPaths)
             {
                 if (!File.Exists(path) || !path.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
@@ -49,8 +52,10 @@ internal static class Program
             Directory.CreateDirectory(outputDir);
 
             // Model is loaded from local disk only. No model downloads or network calls.
+            _stage = "caricamento modello Whisper";
             using var factory = WhisperFactory.FromPath(model);
             var segments = new List<Segment>();
+            var skippedSources = new List<string>();
             foreach (var (source, speaker) in audioPaths)
             {
                 var temp = Path.Combine(Path.GetTempPath(), "meeting-stt-" + Guid.NewGuid().ToString("N") + ".wav");
@@ -58,7 +63,20 @@ internal static class Program
                 {
                     // WASAPI may produce stereo, surround, float, 44/48 kHz etc.
                     // Whisper expects signed PCM mono 16 kHz.
-                    NormalizeToPcm16k(source, temp);
+                    _stage = "conversione WAV " + speaker;
+                    try
+                    {
+                        NormalizeToPcm16k(source, temp);
+                    }
+                    catch (InvalidDataException ex) when (ex.Message == "AUDIO_TOO_SHORT")
+                    {
+                        // A disconnected or silent WASAPI endpoint can produce
+                        // a header-only WAV. Process the other recorded track.
+                        skippedSources.Add(speaker);
+                        continue;
+                    }
+
+                    _stage = "riconoscimento vocale " + speaker;
                     using var processor = factory.CreateBuilder().WithLanguage("it").Build();
                     await using var wav = File.OpenRead(temp);
                     await foreach (var part in processor.ProcessAsync(wav))
@@ -75,6 +93,7 @@ internal static class Program
                     catch { /* deletion best effort, file stored in local temp */ }
                 }
             }
+            _stage = "verifica del risultato";
             if (segments.Count == 0)
                 throw new InvalidOperationException("Nessuna voce riconosciuta. Verifica audio, durata e modello.");
 
@@ -86,6 +105,7 @@ internal static class Program
             var textResult = string.Join(Environment.NewLine, lines) + Environment.NewLine;
             var transcriptPath = Path.Combine(outputDir,
                 $"trascrizione-audio-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.txt");
+            _stage = "scrittura TXT";
             using (var fs = new FileStream(transcriptPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             using (var writer = new StreamWriter(fs, new UTF8Encoding(false)))
             {
@@ -97,14 +117,20 @@ internal static class Program
             {
                 TranscriptPath = transcriptPath,
                 Segments = segments.Count,
-                Sources = audioPaths.Select(s => s.Source).ToArray()
+                Sources = audioPaths.Select(s => s.Source).ToArray(),
+                SkippedSources = skippedSources.ToArray()
             }));
             return 0;
         }
         catch (Exception ex)
         {
-            // Never echo audio/transcript content on stderr. Keep diagnostics concise.
-            Console.Error.WriteLine("STT non riuscita: " + ex.GetType().Name + ": " + ex.Message);
+            // Structured stage/type diagnostics, without raw meeting content or paths.
+            Console.Error.WriteLine(JsonSerializer.Serialize(new
+            {
+                Code = "STT_FAILED",
+                Stage = _stage,
+                ErrorType = ex.GetType().Name
+            }));
             return 1;
         }
     }
@@ -137,7 +163,7 @@ internal static class Program
     {
         using var reader = new WaveFileReader(input);
         if (reader.TotalTime.TotalMilliseconds < 200)
-            throw new InvalidDataException("Il file WAV non contiene una registrazione utile.");
+            throw new InvalidDataException("AUDIO_TOO_SHORT");
         ISampleProvider mono = new MonoSampleProvider(reader.ToSampleProvider());
         ISampleProvider resampled = new WdlResamplingSampleProvider(mono, 16000);
         using var target = new FileStream(output, FileMode.CreateNew, FileAccess.Write, FileShare.None);
