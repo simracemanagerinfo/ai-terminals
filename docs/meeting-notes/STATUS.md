@@ -1,6 +1,6 @@
 # Meeting Notes — stato implementazione
 
-Aggiornamento: 2026-11-19
+Aggiornamento: 2026-11-23
 
 ## Ambito e isolamento
 - Repo: simracemanagerinfo/ai-terminals
@@ -45,8 +45,23 @@ da collaudare sul PC aziendale con account e policy autorizzati.
 - Generato anche minutes.txt, versione testuale di fallback.
 - Per provarlo occorre generare un nuovo verbale; i file precedenti non cambiano.
 
+## Fase 2 — UI Windows: IMPLEMENTATA (v0.1, da provare su desktop)
+- Progetto WPF separato src/meetings/MeetingNotes.csproj (net10.0-windows).
+- Import TXT, titolo riunione, provider Claude/Codex/Mock, stile italiano,
+  consenso esplicito prima di invio non locale, generazione/cancellazione.
+- Anteprima testuale, apertura HTML, apertura cartella, copia testo,
+  copia HTML direttamente negli appunti Windows per Outlook.
+- PowerShell invocato tramite processo senza shell interpolation e con
+  limite di 10 minuti; output JSON machine-readable con flag -AsJson.
+- Copia CF_HTML con offset UTF-8 verificati, HTML senza script esterni.
+- Packaging autonomo MeetingNotes-win-x64 tramite pipeline Windows isolata.
+- Installer GitHub CLI dedicato, senza toccare installer degli altri terminali.
+
+Verifiche automatizzate: Windows build, PowerShell, CLI mock e test offsets CF_HTML.
+Resta da confermare l'uso con GUI, login CLI reale e Outlook desktop sul PC
+aziendale. Non dichiarare completo il collaudo E2E prima di questi riscontri.
+
 ## Prossime fasi (NON ancora implementate)
-- UI MeetingNotes.exe autonoma con import TXT, generazione e anteprima.
 - Registrazione audio Windows (WASAPI) e trascrizione locale STT.
 - Sicurezza avanzata: cifratura, conservazione automatica, gestione consensi.
 - Eventuale packaging, release separata e internazionalizzazione completa.
