@@ -32,6 +32,7 @@ jobs:
             'scripts/meetings/Invoke-MeetingProvider.ps1',
             'scripts/meetings/Install-MeetingNotes.ps1',
             'scripts/meetings/Install-WhisperModel.ps1',
+            'scripts/meetings/New-MeetingNotesIcon.ps1',
             'tests/MeetingMinutes.Tests.ps1'
           )
           foreach ($path in $files) {
@@ -65,6 +66,21 @@ jobs:
               throw "Missing Meeting Notes artifact: $file"
             }
           }
+      - name: Verify native Windows application icon
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $source = 'src/meetings/Resources/MeetingNotes.ico'
+          if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw 'Generated ICO missing.' }
+          $bytes = [IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $source).Path)
+          if ($bytes.Length -lt 400 -or $bytes[2] -ne 1 -or $bytes[4] -ne 1) {
+            throw 'Generated Windows ICO header invalid.'
+          }
+          Add-Type -AssemblyName System.Drawing
+          $icon = [Drawing.Icon]::ExtractAssociatedIcon((Resolve-Path 'out/MeetingNotes/MeetingNotes.exe').Path)
+          if ($null -eq $icon -or $icon.Width -lt 16) { throw 'Executable icon not embedded.' }
+          Write-Host '[PASS] Embedded Windows executable icon available.'
+          $icon.Dispose()
       - name: Publish offline CPU Whisper transcriber
         shell: pwsh
         run: |
