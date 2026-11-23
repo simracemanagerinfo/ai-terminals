@@ -114,10 +114,11 @@ pwsh -NoProfile -File "$project\scripts\meetings\Install-MeetingNotes.ps1"
 & "$project\out\MeetingNotes\MeetingNotes.exe"
 ~~~
 
-La procedura usa GitHub CLI (gh) già autenticato per scaricare l'ultima build
-riuscita del workflow meeting-notes-tests.yml e la verifica prima di sostituire
-l'installazione precedente. Se gh non è disponibile, compilazione locale
-alternativa (richiede .NET 10 SDK):
+L'installer non richiede gh: cerca GITHUB_TOKEN, GH_TOKEN, GitHub CLI (se presente)
+o le credenziali di Git Credential Manager, generalmente già usate per
+git pull. Scarica l'ultimo pacchetto riuscito tramite API GitHub con staging
+e backup. Se nessuna credenziale è disponibile, prova dotnet publish
+qualora sia installato .NET 10 SDK. Compilazione locale manuale alternativa:
 
 ~~~powershell
 $project = 'C:\Users\Overdata\Documents\workspace\personale\ai-terminals-voice'
@@ -138,9 +139,27 @@ dotnet publish "$project\src\meetings\MeetingNotes.csproj" -c Release -r win-x64
    usa il formato CF_HTML di Windows con offset UTF-8, oltre al testo semplice.
 6. In alternativa scegli 'Apri HTML', 'Copia testo' o 'Apri cartella'.
 
-La UI non registra ancora audio. La raccolta audio Windows e la trascrizione
-locale sono attività successive e vanno abilitate solo nel rispetto delle
-policy interne per registrazioni e consensi.
+### Prova audio locale (senza trascrizione automatica)
+
+Nella finestra Meeting Notes è presente una sezione "Prova registrazione audio".
+
+1. Conferma che la prova è consentita dalle policy aziendali e che i partecipanti
+   sono stati informati quando necessario. Per il primo collaudo usa audio
+   sintetico/non riservato, ad esempio un video di prova e la tua voce.
+2. Scegli "Microfono", "Audio del PC" oppure entrambi.
+3. Premi "Registra", parla nel microfono e riproduci un contenuto di prova
+   dal computer. La registrazione locale si ferma automaticamente dopo 10 minuti.
+4. Premi "Ferma", poi "File audio": vengono salvati file WAV distinti
+   microfono.wav e audio-pc.wav nella cartella delle registrazioni.
+5. Ascolta i due file separatamente per verificare chiarezza, livelli e
+   funzionamento effettivo delle sorgenti.
+
+I file restano solo nel dispositivo Windows. Nessun upload automatico,
+nessun bot nelle riunioni, nessuna connessione a Claude per questa prova.
+Con dispositivo audio silenzioso, WASAPI loopback potrebbe generare un file
+vuoto o contenente solo l'intestazione. In questo step **non** vengono ancora
+trascritti i WAV, né viene generata automaticamente la minuta dall'audio.
+La trascrizione offline (Whisper o alternativa) resta nel prossimo step.
 
 ### Test eseguiti
 
