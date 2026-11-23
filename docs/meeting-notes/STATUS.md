@@ -64,8 +64,25 @@ Pacchetto: MeetingNotes-win-x64 (autonomo, non incluso nelle release stabili).
 Resta da confermare l'uso con GUI, login CLI reale e Outlook desktop sul PC
 aziendale. Non dichiarare completo il collaudo E2E prima di questi riscontri.
 
+## Fase 3a — Test registrazione locale: IMPLEMENTATA, COLLAUDO DEVICE DA FARE
+- NAudio 3.3 (WASAPI) integrato nel progetto WPF autonomo.
+- Nell'interfaccia si possono selezionare microfono e audio del PC.
+- Vengono creati WAV distinti nella cartella locale recordings.
+- Richiesta conferma prima di registrare; nessun upload o uso del modello.
+- Registrazione limitata a 10 minuti per ogni collaudo e stop manuale.
+- Per verificare dispositivi e contenuto dei file serve un PC Windows fisico,
+  GitHub Actions non può simulare microfono e loopback in una sessione desktop reale.
+- Non presente la trascrizione locale WAV → TXT (step successivo).
+
+## Installer migliorato
+- Non richiede più gh: usa GITHUB_TOKEN/GH_TOKEN, gh opzionale o credenziali
+  git credential fill (Git Credential Manager), già disponibili con git pull.
+- Scarica artifacts dal workflow Windows tramite API GitHub, con stage/backup.
+- Senza credenziali prova dotnet publish, se il .NET SDK è disponibile.
+- Installazione sul PC aziendale ancora da verificare realmente.
+
 ## Prossime fasi (NON ancora implementate)
-- Registrazione audio Windows (WASAPI) e trascrizione locale STT.
+- Trascrizione locale STT dei WAV, da valutare con whisper.cpp e modello approvato.
 - Sicurezza avanzata: cifratura, conservazione automatica, gestione consensi.
 - Eventuale packaging, release separata e internazionalizzazione completa.
 
