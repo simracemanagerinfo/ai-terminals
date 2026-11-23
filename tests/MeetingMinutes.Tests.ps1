@@ -60,17 +60,17 @@ try {
     Require (-not $html.Contains('http://')) 'L email non deve richiamare contenuti esterni'
     Require (-not $html.Contains('https://')) 'L email non deve richiamare contenuti esterni'
     Require ($result.MinutesStyle -eq 'Bilanciato') 'Stile predefinito non corretto'
-    Require ($html.Contains('<p style="margin:0 0 10px 0;">Anomalie e qualità</p>')) 'Argomenti bilanciati non sono paragrafi'
+    Require ([Net.WebUtility]::HtmlDecode($html).Contains('<p style="margin:0 0 10px 0;">Anomalie e qualità</p>')) 'Argomenti bilanciati non sono paragrafi'
 
     # Tutti e tre gli stili con lo stesso JSON: testiamo la resa HTML,
     # senza consumare token IA né modificare i contenuti.
     $discorsivo = & $runner @args -MinutesStyle Discorsivo
     $discHtml = Get-Content -LiteralPath $discorsivo.HtmlPath -Raw -Encoding utf8
-    Require ($discHtml.Contains('<p style="margin:0 0 10px 0;">Anomalie e qualità</p>')) 'Stile discorsivo senza paragrafi'
+    Require ([Net.WebUtility]::HtmlDecode($discHtml).Contains('<p style="margin:0 0 10px 0;">Anomalie e qualità</p>')) 'Stile discorsivo senza paragrafi'
     Require ($discHtml.Contains('<p style="margin:0 0 9px 0;">')) 'Cronologia discorsiva senza paragrafi'
     $sintetico = & $runner @args -MinutesStyle Sintetico
     $synHtml = Get-Content -LiteralPath $sintetico.HtmlPath -Raw -Encoding utf8
-    Require ($synHtml.Contains('<li style="margin:0 0 5px 0;">Anomalie e qualità</li>')) 'Stile sintetico senza elenchi'
+    Require ([Net.WebUtility]::HtmlDecode($synHtml).Contains('<li style="margin:0 0 5px 0;">Anomalie e qualità</li>')) 'Stile sintetico senza elenchi'
     Require ($synHtml.Contains('<table ')) 'Tabella attività non mantenuta nello stile sintetico'
     Require ($synHtml.Contains('&lt;script&gt;')) 'Protezione XSS mancante nello stile sintetico'
     $synText = Get-Content -LiteralPath $sintetico.TextPath -Raw -Encoding utf8
