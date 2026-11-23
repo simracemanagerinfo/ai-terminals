@@ -1,4 +1,4 @@
-name: Publish AI Terminals v1.1.1
+name: Publish AI Terminals v1.1.2
 
 on:
   workflow_run:
@@ -41,8 +41,8 @@ jobs:
           }
           $exists = $false
           try {
-            $published = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/v1.1.1" -Headers $headers -TimeoutSec 30
-            if ($published.draft) { throw 'Release v1.1.1 exists as a draft: manual review required' }
+            $published = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/v1.1.2" -Headers $headers -TimeoutSec 30
+            if ($published.draft) { throw 'Release v1.1.2 exists as a draft: manual review required' }
             $exists = $true
           }
           catch {
@@ -50,7 +50,7 @@ jobs:
                 [int]$_.Exception.Response.StatusCode -ne 404) { throw }
           }
           if ($exists) {
-            Write-Host 'v1.1.1 already published: do not attempt to recreate an existing immutable release.'
+            Write-Host 'v1.1.2 already published: do not attempt to recreate an existing immutable release.'
             "exists=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           }
           else {
@@ -91,7 +91,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           foreach ($project in @('src/claude/ClaudeTerminal.csproj', 'src/codex/CodexTerminal.csproj')) {
             [xml]$xml = Get-Content -LiteralPath $project -Raw
-            if ($xml.Project.PropertyGroup.Version -ne '1.1.1') {
+            if ($xml.Project.PropertyGroup.Version -ne '1.1.2') {
               throw "Unexpected version for ${project}: $($xml.Project.PropertyGroup.Version)"
             }
           }
@@ -141,7 +141,7 @@ jobs:
           $checksums += "$digest  AI-Terminals-Setup.exe"
           $checksums | Set-Content -LiteralPath 'release-assets/SHA256SUMS.txt' -Encoding ascii
 
-      - name: Publish stable GitHub Release v1.1.1
+      - name: Publish stable GitHub Release v1.1.2
         if: steps.publication.outputs.exists != 'true'
         shell: pwsh
         env:
@@ -149,7 +149,7 @@ jobs:
           TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           $ErrorActionPreference = 'Stop'
-          gh release create v1.1.1 'release-assets/AI-Terminals-Setup.exe' 'release-assets/ClaudeTerminal-win-x64.zip' 'release-assets/CodexTerminal-win-x64.zip' 'release-assets/SHA256SUMS.txt' --repo $env:GITHUB_REPOSITORY --target $env:TESTED_SHA --title 'AI Terminals v1.1.1' --notes-file 'docs/releases/v1.1.1.md' --latest
+          gh release create v1.1.2 'release-assets/AI-Terminals-Setup.exe' 'release-assets/ClaudeTerminal-win-x64.zip' 'release-assets/CodexTerminal-win-x64.zip' 'release-assets/SHA256SUMS.txt' --repo $env:GITHUB_REPOSITORY --target $env:TESTED_SHA --title 'AI Terminals v1.1.2' --notes-file 'docs/releases/v1.1.2.md' --latest
           if ($LASTEXITCODE -ne 0) {
             throw "GitHub release publication failed ($LASTEXITCODE)"
           }

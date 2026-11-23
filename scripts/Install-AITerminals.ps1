@@ -69,6 +69,43 @@ function Get-InstallerArtifactSize {
     return $bytes
 }
 
+# Decode public SHA256SUMS.txt bytes as UTF-8 (GitHub may serve binary MIME).
+function Read-ReleaseChecksumManifest {
+    param([Parameter(Mandatory)][string]$Url)
+    $tempFile = Join-Path ([IO.Path]::GetTempPath()) ('aiterminals-sha256-' + [guid]::NewGuid().ToString('N') + '.txt')
+    try {
+        Invoke-WebRequest -Uri $Url -OutFile $tempFile -MaximumRedirection 5 -TimeoutSec 45 -ErrorAction Stop | Out-Null
+        $content = Get-Content -LiteralPath $tempFile -Raw -Encoding utf8 -ErrorAction Stop
+        if ([string]::IsNullOrWhiteSpace($content)) { throw 'Manifest SHA256SUMS.txt vuoto.' }
+        return [string]$content
+    }
+    finally {
+        if (Test-Path -LiteralPath $tempFile) {
+            Remove-Item -LiteralPath $tempFile -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+# Require exactly one valid SHA-256 entry for the requested archive.
+function Get-ReleaseExpectedHash {
+    param([Parameter(Mandatory)][string]$Manifest, [Parameter(Mandatory)][string]$AssetName)
+    $found = @()
+    foreach ($line in ($Manifest -split '\r?\n')) {
+        $fields = @($line.Trim() -split '[ \t]+', 2)
+        if ($fields.Count -ne 2) { continue }
+        $filename = $fields[1].TrimStart('*')
+        if ($filename -cne $AssetName) { continue }
+        if ($fields[0] -notmatch '^[0-9a-fA-F]{64}$') {
+            throw "Checksum SHA256 non valido per $AssetName."
+        }
+        $found += $fields[0].ToLowerInvariant()
+    }
+    if ($found.Count -ne 1) {
+        throw "Checksum SHA256 mancante o duplicato per $AssetName."
+    }
+    return $found[0]
+}
+
 function Select-Build {
     if ($RunId -gt 0) {
         $selected = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/actions/runs/$RunId" -Headers $headers -TimeoutSec 45
@@ -113,7 +150,7 @@ else {
         throw "GitHub Release $($release.tag_name) priva di SHA256SUMS.txt"
     }
     # I download delle release pubbliche non ricevono il token GitHub.
-    $checksumText = (Invoke-WebRequest -Uri $checksumAsset[0].browser_download_url -TimeoutSec 45 -ErrorAction Stop).Content
+    $checksumText = Read-ReleaseChecksumManifest -Url $checksumAsset[0].browser_download_url
 }
 $apps = if ($App -eq 'Both') { @('Claude','Codex') } else { @($App) }
 
@@ -158,15 +195,9 @@ foreach ($agent in $apps) {
     try {
         New-Item -ItemType Directory -Path $stage -Force | Out-Null
         if ($null -ne $release) {
+            $expectedHash = Get-ReleaseExpectedHash -Manifest $checksumText -AssetName ($artifactName + '.zip')
             Write-Host "GitHub Release $($release.tag_name): $artifactName.zip" -ForegroundColor Cyan
             Invoke-WebRequest -Uri $artifact[0].browser_download_url -OutFile $archive -MaximumRedirection 5 -TimeoutSec 240 -ErrorAction Stop | Out-Null
-
-            $checksumPattern = '^(?<hash>[0-9a-fA-F]{64})\s+' + [regex]::Escape("$artifactName.zip") + '$'
-            $lines = @($checksumText -split '\r?\n' | Where-Object { $_ -match $checksumPattern } | Select-Object -First 1)
-            if ($lines.Count -ne 1) {
-                throw "Checksum mancante nella release per $artifactName.zip."
-            }
-            $expectedHash = ($lines[0] -split '\s+')[0].ToLowerInvariant()
             $actualHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
             if ($actualHash -ne $expectedHash) {
                 throw "Checksum SHA256 non corrispondente per $artifactName.zip."

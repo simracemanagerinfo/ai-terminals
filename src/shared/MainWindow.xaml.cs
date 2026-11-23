@@ -26,7 +26,7 @@ public partial class MainWindow : Window
     private string? _visibleTerminalId;
     private readonly Dictionary<string, LiveItem> _sessions = new(StringComparer.Ordinal);
     private readonly HashSet<string> _collapsedFolders = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _knownBinSections = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _initializedFolderSections = new(StringComparer.OrdinalIgnoreCase);
     private SessionOrganization? _organization;
     private string? _organizationLoadError;
     private bool _applyingLanguage;
@@ -627,6 +627,20 @@ public partial class MainWindow : Window
 
         if (_project is not null)
         {
+            // On first presentation, all folders begin collapsed. Once a user
+            // expands one, preserve that UI state while the app stays open.
+            // An active conversation selected explicitly opens its folder.
+            void InitializeSection(string section)
+            {
+                if (_initializedFolderSections.Add(section))
+                    _collapsedFolders.Add(section);
+            }
+            if (_organization is not null)
+                foreach (var folder in _organization.Folders(_project))
+                    InitializeSection(SectionKey(folder.Id));
+            InitializeSection(SectionKey("__unfiled__"));
+            InitializeSection(SectionKey(SessionOrganization.Bin));
+
             if (preferredTerminalId is not null &&
                 _live.FirstOrDefault(x => x.Id == preferredTerminalId) is { } target &&
                 target.ProjectPath.Equals(_project, StringComparison.OrdinalIgnoreCase))
@@ -674,9 +688,6 @@ public partial class MainWindow : Window
             AddFolder(SessionOrganization.Unfiled, UiText.T("unorganized"));
 
             // The Bin always stays last, below all active and stored chats.
-            var binSection = SectionKey(SessionOrganization.Bin);
-            if (_knownBinSections.Add(binSection))
-                _collapsedFolders.Add(binSection);
             AddFolder(SessionOrganization.Bin, UiText.T("bin"));
         }
 
