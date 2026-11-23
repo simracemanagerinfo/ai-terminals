@@ -139,6 +139,16 @@ l'editor e la copia TXT, nonché la cattura audio su dispositivi reali.
   runtime VC++ disponibili, differenze di sincronizzazione/eco tra sorgenti;
   STT non parte automaticamente dopo il pulsante Ferma.
 
+### Collaudo CI fase 3b (2026-11-23)
+
+- GitHub Actions run **45141323188: PASS**.
+- https://github.com/simracemanagerinfo/ai-terminals/actions/runs/45141323188
+- Verificati su Windows: PowerShell scripts, minute mock, pubblicazione WPF
+  e transcriber CPU, self-test normalizzazione WAV, appunti Outlook,
+  test workspace e download dell'artefatto mediante installer senza gh.
+- Artefatto: MeetingNotes-win-x64, contenente MeetingTranscriber.exe.
+- **Non testata in CI l'inferenza con modello reale né l'accuratezza su audio italiano**:
+  primo collaudo necessario sul PC aziendale dell'utente.
 ## Prossime fasi (NON ancora implementate)
 - Collaudo su PC aziendale di Whisper CPU con modello reale, accuratezza e prestazioni.
 - Sicurezza avanzata: cifratura, conservazione automatica, gestione consensi.
