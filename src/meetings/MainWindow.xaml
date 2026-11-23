@@ -82,6 +82,31 @@
                     ValueChanged="StyleInput_ValueChanged"
                     Margin="0,0,0,17"/>
 
+            <Border Background="#F5FAFC" BorderBrush="#DCE6EA" BorderThickness="1"
+                    CornerRadius="8" Padding="12" Margin="0,0,0,18">
+              <StackPanel>
+                <TextBlock Text="Prova registrazione audio" FontSize="15" FontWeight="Bold"/>
+                <TextBlock Text="Acquisizione locale in WAV, senza inviare nulla all'IA."
+                           Foreground="#647887" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,10"/>
+                <WrapPanel Margin="0,0,0,8">
+                  <CheckBox x:Name="CaptureMicrophone" Content="Microfono" IsChecked="True" Margin="0,0,18,0"/>
+                  <CheckBox x:Name="CaptureSystem" Content="Audio del PC" IsChecked="True"/>
+                </WrapPanel>
+                <CheckBox x:Name="RecordingPermission" Margin="0,3,0,12" FontSize="11"
+                          Content="Confermo di poter registrare questa prova in base alle policy aziendali."/>
+                <WrapPanel>
+                  <Button x:Name="StartAudioButton" Content="● Registra" Click="StartAudio_Click" Padding="12,7"
+                          Background="#176F71" Foreground="White" BorderBrush="#176F71" Margin="0,0,8,8"/>
+                  <Button x:Name="StopAudioButton" Content="■ Ferma" Click="StopAudio_Click" Padding="12,7"
+                          IsEnabled="False" Margin="0,0,8,8"/>
+                  <Button x:Name="OpenAudioFolderButton" Content="File audio" Click="OpenAudioFolder_Click"
+                          Padding="12,7" IsEnabled="False" Margin="0,0,8,8"/>
+                </WrapPanel>
+                <TextBlock x:Name="AudioStatusText" FontSize="11" Foreground="#647887"
+                           TextWrapping="Wrap" Text="Pronto. Nessuna registrazione in corso."/>
+              </StackPanel>
+            </Border>
+
             <Border x:Name="ConsentPanel" Background="#F3F7F7" CornerRadius="8" Padding="12" Margin="0,0,0,16">
               <StackPanel>
                 <CheckBox x:Name="ConsentInput"
