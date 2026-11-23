@@ -13,6 +13,8 @@ namespace MeetingNotes;
 public partial class MainWindow : Window
 {
     private string? _transcriptPath;
+    private string? _savedTranscriptText;
+    private string _workspaceRoot = WorkspaceStore.LoadPreferredRoot();
     private string? _mockJsonPath;
     private string? _htmlPath;
     private string? _textPath;
@@ -25,35 +27,128 @@ public partial class MainWindow : Window
     private bool _stoppingAudio;
     private bool _closingAudio;
 
-    private static string OutputDirectory =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "AI-Terminals", "MeetingNotes");
-
     public MainWindow()
     {
         InitializeComponent();
         ProviderInput.SelectedIndex = 0;
         StyleInput.Value = 80;
+        WorkspaceInput.Text = _workspaceRoot;
         _audioTimer.Tick += AudioTimer_Tick;
     }
 
     private string Provider =>
         (ProviderInput.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Claude";
 
+    private void BrowseWorkspace_Click(object sender, RoutedEventArgs e)
+    {
+        if (_audioCapture is not null || _cancelSource is not null)
+            return;
+
+        using var dialog = new System.Windows.Forms.FolderBrowserDialog
+        {
+            Description = "Scegli dove conservare registrazioni, trascrizioni e minute",
+            ShowNewFolderButton = true,
+            SelectedPath = Directory.Exists(_workspaceRoot) ? _workspaceRoot :
+                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+        };
+        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+            return;
+
+        try
+        {
+            var folder = WorkspaceStore.ValidateRoot(dialog.SelectedPath);
+            WorkspaceStore.SavePreferredRoot(folder);
+            _workspaceRoot = folder;
+            WorkspaceInput.Text = folder;
+            _transcriptPath = null;
+            _savedTranscriptText = null;
+            TranscriptInput.Text = string.IsNullOrWhiteSpace(TranscriptEditor.Text)
+                ? "Nessun TXT selezionato" : "Testo in memoria: usa Salva TXT";
+            StatusText.Text = "Cartella di lavoro selezionata. Nessun file preesistente spostato.";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Cartella di lavoro non valida",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private void BrowseTranscript_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog
         {
-            Title = "Seleziona una trascrizione",
+            Title = "Importa una trascrizione",
             Filter = "Trascrizioni di testo (*.txt)|*.txt|Tutti i file (*.*)|*.*",
-            CheckFileExists = true
+            CheckFileExists = true,
+            InitialDirectory = Directory.Exists(WorkspaceStore.Transcripts(_workspaceRoot))
+                ? WorkspaceStore.Transcripts(_workspaceRoot) : _workspaceRoot
         };
         if (dialog.ShowDialog(this) != true)
             return;
-        _transcriptPath = dialog.FileName;
-        TranscriptInput.Text = dialog.FileName;
-        if (TitleInput.Text == "Riunione di lavoro")
-            TitleInput.Text = Path.GetFileNameWithoutExtension(dialog.FileName);
+
+        try
+        {
+            var file = new FileInfo(dialog.FileName);
+            if (file.Length > WorkspaceStore.MaxTranscriptBytes)
+                throw new InvalidDataException("Il file supera il limite di 2 MiB.");
+            var text = File.ReadAllText(file.FullName, Encoding.UTF8);
+            if (string.IsNullOrWhiteSpace(text))
+                throw new InvalidDataException("La trascrizione selezionata è vuota.");
+
+            TranscriptEditor.Text = text;
+            _transcriptPath = file.FullName;
+            _savedTranscriptText = null;
+            TranscriptInput.Text = file.FullName;
+            if (TitleInput.Text == "Riunione di lavoro")
+                TitleInput.Text = Path.GetFileNameWithoutExtension(file.Name);
+            StatusText.Text = "TXT importato. Puoi modificarlo e salvarne una copia nella cartella scelta.";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Impossibile importare la trascrizione",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void NewTranscript_Click(object sender, RoutedEventArgs e)
+    {
+        TranscriptEditor.Clear();
+        _transcriptPath = null;
+        _savedTranscriptText = null;
+        TranscriptInput.Text = "Nuovo testo da salvare";
+        StatusText.Text = "Scrivi o incolla una trascrizione e premi Salva TXT.";
+        TranscriptEditor.Focus();
+    }
+
+    private string SaveTranscriptToWorkspace()
+    {
+        var text = TranscriptEditor.Text;
+        if (string.IsNullOrWhiteSpace(text))
+            throw new InvalidOperationException("Scrivi o importa il testo della trascrizione.");
+
+        if (_savedTranscriptText == text && !string.IsNullOrWhiteSpace(_transcriptPath)
+            && File.Exists(_transcriptPath))
+            return _transcriptPath;
+
+        var saved = WorkspaceStore.CreateTranscript(_workspaceRoot, TitleInput.Text, text);
+        _transcriptPath = saved;
+        _savedTranscriptText = text;
+        TranscriptInput.Text = saved;
+        return saved;
+    }
+
+    private void SaveTranscript_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var path = SaveTranscriptToWorkspace();
+            StatusText.Text = "TXT salvato nella cartella di lavoro: " + Path.GetFileName(path);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Impossibile salvare il TXT",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void BrowseMock_Click(object sender, RoutedEventArgs e)
@@ -91,13 +186,16 @@ public partial class MainWindow : Window
         GenerateButton.IsEnabled = !busy;
         CancelButton.IsEnabled = busy;
         ProviderInput.IsEnabled = !busy;
+        BrowseWorkspaceButton.IsEnabled = !busy && _audioCapture is null;
+        SaveTranscriptButton.IsEnabled = !busy;
+        NewTranscriptButton.IsEnabled = !busy;
     }
 
     private async void Generate_Click(object sender, RoutedEventArgs e)
     {
-        if (_transcriptPath is null || !File.Exists(_transcriptPath))
+        if (string.IsNullOrWhiteSpace(TranscriptEditor.Text))
         {
-            MessageBox.Show(this, "Seleziona prima una trascrizione TXT.", "Meeting Notes",
+            MessageBox.Show(this, "Importa o scrivi una trascrizione prima di generare la minuta.", "Meeting Notes",
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
@@ -120,6 +218,15 @@ public partial class MainWindow : Window
         {
             MessageBox.Show(this, "Script PowerShell non trovato nella distribuzione: " + script,
                 "Meeting Notes", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        string transcriptToUse;
+        try { transcriptToUse = SaveTranscriptToWorkspace(); }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Impossibile salvare il TXT",
+                MessageBoxButton.OK, MessageBoxImage.Error);
             return;
         }
 
@@ -147,8 +254,8 @@ public partial class MainWindow : Window
             foreach (var arg in new[]
             {
                 "-NoLogo", "-NoProfile", "-NonInteractive", "-File", script,
-                "-TranscriptPath", _transcriptPath,
-                "-OutputDirectory", OutputDirectory,
+                "-TranscriptPath", transcriptToUse,
+                "-OutputDirectory", WorkspaceStore.Minutes(_workspaceRoot),
                 "-Provider", Provider,
                 "-MeetingTitle", TitleInput.Text,
                 "-StyleLevel", ((int)StyleInput.Value).ToString(System.Globalization.CultureInfo.InvariantCulture),
@@ -247,12 +354,13 @@ public partial class MainWindow : Window
         }
         try
         {
-            var root = Path.Combine(OutputDirectory, "recordings");
+            var root = WorkspaceStore.Recordings(_workspaceRoot);
             _audioCapture = AudioCaptureSession.Start(root, mic, system);
             _lastAudioFolder = _audioCapture.Folder;
             _audioStartedUtc = DateTime.UtcNow;
             CaptureMicrophone.IsEnabled = false;
             CaptureSystem.IsEnabled = false;
+            BrowseWorkspaceButton.IsEnabled = false;
             StartAudioButton.IsEnabled = false;
             StopAudioButton.IsEnabled = true;
             OpenAudioFolderButton.IsEnabled = false;
@@ -319,6 +427,7 @@ public partial class MainWindow : Window
             CaptureMicrophone.IsEnabled = true;
             CaptureSystem.IsEnabled = true;
             StartAudioButton.IsEnabled = true;
+            BrowseWorkspaceButton.IsEnabled = _cancelSource is null;
             RecordingPermission.IsChecked = false;
         }
     }
