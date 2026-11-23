@@ -369,3 +369,26 @@ Questi comportamenti sono verificati automaticamente con unit/smoke test
 sintetici per impostazioni, TXT, limiti dei percorsi e cancellazione.
 La sincronizzazione con il dispositivo audio fisico richiede comunque
 un collaudo Windows interattivo.
+
+
+## Comandi rapidi sempre visibili (v0.6)
+
+Dopo l'avvio, nell'angolo **in alto a destra** sono disponibili:
+- **Registra**: avvia subito la registrazione usando microfono e audio del PC
+  selezionati nella barra sinistra. Se la conferma di registrazione non è
+  selezionata, la richiede tramite una finestra esplicita, senza dover
+  scorrere in basso per trovare la casella.
+- **Ferma**: termina l'acquisizione e avvia la trascrizione automatica
+  offline, rispettando l'impostazione di conservazione dei WAV.
+- **Timer hh:mm:ss e stato**: sono visibili anche quando si scorre il
+  pannello laterale. Durante l'elaborazione viene mostrato lo stato
+  della trascrizione.
+
+I pulsanti rapidi richiamano **gli stessi handler** dei pulsanti presenti
+nella barra laterale e ne seguono lo stato abilitato/disabilitato.
+Non esistono due registratori distinti: non è possibile avviare una
+seconda acquisizione con il tasto duplicato mentre la prima è attiva.
+
+La colonna sinistra resta dedicata a sorgenti, consenso, modelli,
+preferenze e opzioni avanzate. Il gruppo comandi in alto resta fuori
+dal pannello scorrevole.
