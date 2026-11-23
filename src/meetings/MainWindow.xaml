@@ -35,6 +35,20 @@
             <TextBlock Text="Seleziona la trascrizione e il modello da utilizzare."
                        Foreground="#647887" Margin="0,5,0,20" TextWrapping="Wrap"/>
 
+            <TextBlock Text="Cartella di lavoro" FontWeight="SemiBold" Margin="0,0,0,6"/>
+            <Grid Margin="0,0,0,5">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <TextBox x:Name="WorkspaceInput" Grid.Column="0" IsReadOnly="True"
+                       ToolTip="Percorso locale dei file di questa riunione"/>
+              <Button x:Name="BrowseWorkspaceButton" Grid.Column="1" Margin="7,0,0,0"
+                      Content="Scegli cartella..." Click="BrowseWorkspace_Click"/>
+            </Grid>
+            <TextBlock Text="I WAV, i TXT e le minute sono salvati qui, in sottocartelle separate."
+                       Foreground="#647887" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,18"/>
+
             <TextBlock Text="Titolo riunione" FontWeight="SemiBold" Margin="0,0,0,6"/>
             <TextBox x:Name="TitleInput" Text="Riunione di lavoro" Margin="0,0,0,16"/>
 
@@ -49,6 +63,16 @@
 />
               <Button Grid.Column="1" Margin="7,0,0,0" Content="Sfoglia..." Click="BrowseTranscript_Click"/>
             </Grid>
+
+            <TextBlock Text="Testo trascrizione (modificabile)" FontWeight="SemiBold" Margin="0,0,0,6"/>
+            <TextBox x:Name="TranscriptEditor" AcceptsReturn="True" AcceptsTab="False"
+                     TextWrapping="Wrap" Height="118" VerticalContentAlignment="Top"
+                     VerticalScrollBarVisibility="Auto" MaxLength="2000000"
+                     ToolTip="Inserisci il testo manualmente o importalo da un TXT."/>
+            <WrapPanel Margin="0,7,0,17">
+              <Button x:Name="NewTranscriptButton" Content="Nuovo testo" Click="NewTranscript_Click" Margin="0,0,8,0"/>
+              <Button x:Name="SaveTranscriptButton" Content="Salva TXT" Click="SaveTranscript_Click"/>
+            </WrapPanel>
 
             <TextBlock Text="Provider IA" FontWeight="SemiBold" Margin="0,0,0,6"/>
             <ComboBox x:Name="ProviderInput" SelectionChanged="ProviderInput_SelectionChanged" Margin="0,0,0,16">
@@ -125,7 +149,7 @@
                       Click="Cancel_Click" Margin="9,0,0,0" Padding="15,11"/>
             </StackPanel>
 
-            <TextBlock Text="I file prodotti vengono salvati in locale, in una nuova cartella per ogni riunione."
+            <TextBlock Text="WAV e trascrizioni restano locali. Solo la generazione con un CLI IA invia il testo al provider selezionato."
                        Foreground="#647887" FontSize="11" TextWrapping="Wrap" Margin="0,20,0,0"/>
           </StackPanel>
         </ScrollViewer>
@@ -167,7 +191,7 @@
     <Border Grid.Row="2" Background="White" BorderBrush="#DCE6EA" BorderThickness="0,1,0,0"
             Padding="25,11">
       <DockPanel>
-        <TextBlock Text="v0.1 · Import TXT → Claude/Codex → HTML email"
+        <TextBlock Text="v0.2 · Cartella di lavoro · WAV e TXT → minuta Outlook"
                    DockPanel.Dock="Right" Foreground="#647887" HorizontalAlignment="Right" FontSize="11"/>
         <TextBlock x:Name="StatusText" Text="Pronto · Nessun dato inviato" FontSize="12"
                    Foreground="#176F71" TextTrimming="CharacterEllipsis"/>
