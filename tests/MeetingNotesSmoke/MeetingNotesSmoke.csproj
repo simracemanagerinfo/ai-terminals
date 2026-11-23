@@ -12,5 +12,6 @@
     <Compile Include="..\..\src\meetings\WorkspaceStore.cs" Link="WorkspaceStore.cs"/>
     <Compile Include="..\..\src\meetings\RecordingPreferenceStore.cs" Link="RecordingPreferenceStore.cs"/>
     <Compile Include="..\..\src\meetings\RecordingAudioRetention.cs" Link="RecordingAudioRetention.cs"/>
+    <Compile Include="..\..\src\meetings\SttFailureFormatter.cs" Link="SttFailureFormatter.cs"/>
   </ItemGroup>
 </Project>
