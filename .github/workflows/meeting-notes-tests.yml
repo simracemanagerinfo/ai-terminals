@@ -51,6 +51,26 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           & './tests/MeetingMinutes.Tests.ps1'
+      - name: Validate quick recording controls share sidebar handlers
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [xml]$ui = Get-Content 'src/meetings/MainWindow.xaml' -Raw -Encoding utf8
+          $quickStart = $ui.SelectSingleNode("//*[@*[local-name()='Name']='QuickStartAudioButton']")
+          $quickStop = $ui.SelectSingleNode("//*[@*[local-name()='Name']='QuickStopAudioButton']")
+          $quickTimer = $ui.SelectSingleNode("//*[@*[local-name()='Name']='QuickRecordingTimer']")
+          if ($null -eq $quickStart -or $null -eq $quickStop -or $null -eq $quickTimer) {
+            throw 'Quick recording controls are missing.'
+          }
+          if ($quickStart.GetAttribute('Click') -ne 'StartAudio_Click' -or
+              $quickStop.GetAttribute('Click') -ne 'StopAudio_Click') {
+            throw 'Quick buttons must reuse the existing audio handlers.'
+          }
+          if ($quickStart.GetAttribute('IsEnabled') -ne '{Binding IsEnabled, ElementName=StartAudioButton}' -or
+              $quickStop.GetAttribute('IsEnabled') -ne '{Binding IsEnabled, ElementName=StopAudioButton}') {
+            throw 'Quick buttons must mirror the sidebar enabled state.'
+          }
+          Write-Host '[PASS] Quick and sidebar recorder controls share handlers and enabled states.'
       - name: Build independent MeetingNotes Windows app
         shell: pwsh
         run: |
