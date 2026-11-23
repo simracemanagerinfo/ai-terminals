@@ -143,6 +143,26 @@ try {
         Rename-Item -LiteralPath $staging -NewName (Split-Path -Leaf $Destination) -ErrorAction Stop
         $installed = $true
         Write-Host "[OK] Meeting Notes installato in: $Destination" -ForegroundColor Green
+
+        # Collegamento per l'utente corrente, non servono privilegi amministrativi.
+        # Da Start o dall'app avviata è possibile scegliere "Aggiungi alla barra delle applicazioni".
+        try {
+            $programs = [Environment]::GetFolderPath('Programs')
+            if ([string]::IsNullOrWhiteSpace($programs)) { throw 'Cartella menu Start non disponibile.' }
+            New-Item -ItemType Directory -Force -Path $programs | Out-Null
+            $shortcutPath = Join-Path $programs 'Meeting Notes.lnk'
+            $shell = New-Object -ComObject WScript.Shell
+            $shortcut = $shell.CreateShortcut($shortcutPath)
+            $shortcut.TargetPath = Join-Path $Destination 'MeetingNotes.exe'
+            $shortcut.WorkingDirectory = $Destination
+            $shortcut.Description = 'Meeting Notes - registrazione e minute Outlook'
+            $shortcut.IconLocation = (Join-Path $Destination 'MeetingNotes.exe') + ',0'
+            $shortcut.Save()
+            Write-Host "[OK] Collegamento nel menu Start: Meeting Notes" -ForegroundColor Green
+        }
+        catch {
+            Write-Warning "Collegamento menu Start non creato: $($_.Exception.Message). L'eseguibile funziona comunque."
+        }
     }
     catch {
         if ($oldMoved -and -not (Test-Path -LiteralPath $Destination)) {
