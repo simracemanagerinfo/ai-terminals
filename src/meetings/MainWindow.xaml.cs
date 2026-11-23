@@ -585,13 +585,13 @@ public partial class MainWindow : Window
         if (_audioCapture is null || _stoppingAudio)
             return;
         var elapsed = DateTime.UtcNow - _audioStartedUtc;
-        if (elapsed >= TimeSpan.FromMinutes(10))
+        if (elapsed >= TimeSpan.FromMinutes(120))
         {
             _ = StopAudioAsync();
             return;
         }
         AudioStatusText.Text = "● Registrazione locale in corso · " +
-            elapsed.ToString(@"mm\:ss") + ". Nessun upload.";
+            elapsed.ToString(@"hh\:mm\:ss") + ". Nessun upload.";
     }
 
     private async void StopAudio_Click(object sender, RoutedEventArgs e)
