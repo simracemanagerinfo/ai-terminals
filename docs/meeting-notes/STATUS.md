@@ -58,6 +58,15 @@ da collaudare sul PC aziendale con account e policy autorizzati.
 - Installer GitHub CLI dedicato, senza toccare installer degli altri terminali.
 
 Verifiche automatizzate: Windows build, PowerShell, CLI mock e test offsets CF_HTML.
+
+Verifica finale della build con registrazione audio e installer senza gh:
+GitHub Actions run 45135664143, risultato PASS.
+https://github.com/simracemanagerinfo/ai-terminals/actions/runs/45135664143
+Controlli: parser PowerShell, test simulati, build .NET WPF, clipboard UTF-8,
+artifact MeetingNotes-win-x64 e download dell'artifact tramite API GitHub
+con GITHUB_TOKEN, senza gh. Microfono e output WASAPI restano da collaudare
+su una postazione Windows con hardware e permessi reali.
+
 Build GUI e artifact dedicato: run GitHub Actions 45133254586,
 https://github.com/simracemanagerinfo/ai-terminals/actions/runs/45133254586
 Pacchetto: MeetingNotes-win-x64 (autonomo, non incluso nelle release stabili).
