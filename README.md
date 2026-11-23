@@ -13,9 +13,9 @@ Each executable has its own terminal sessions, local folders, UI cache and icon.
 
 ## Installation and updates
 
-**Latest stable release: v1.1.1.** The easiest way to install or update is to [download **AI-Terminals-Setup.exe**](https://github.com/simracemanagerinfo/ai-terminals/releases/latest) and double-click it.
+**Latest stable release: v1.1.2.** The easiest way to install or update is to [download **AI-Terminals-Setup.exe**](https://github.com/simracemanagerinfo/ai-terminals/releases/latest) and double-click it.
 
-The offline Windows setup lets you choose **Claude Terminal**, **Codex Terminal**, or both. It uses the existing per-user application locations, adds Start menu shortcuts, and can create optional desktop shortcuts. **No PowerShell installer script, GitHub login, or administrator privileges required.** Existing virtual folders, saved conversations and UI language settings are kept.
+**In v1.1.2:** PowerShell release updates now correctly read and validate the published SHA-256 manifest, and project folders (including Unorganized and Bin) start collapsed. Right-click a folder heading to choose **New conversation here**.\n\nThe offline Windows setup lets you choose **Claude Terminal**, **Codex Terminal**, or both. It uses the existing per-user application locations, adds Start menu shortcuts, and can create optional desktop shortcuts. **No PowerShell installer script, GitHub login, or administrator privileges required.** Existing virtual folders, saved conversations and UI language settings are kept.
 
 Windows SmartScreen may warn because this new public installer is currently **unsigned**. Do not disable antivirus or SmartScreen. Corporate application control may block executables depending on local policies.
 
