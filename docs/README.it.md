@@ -11,9 +11,9 @@ I progetti in `src/claude/` e `src/codex/` compilano lo stesso codice `src/share
 
 ## Versione stabile
 
-**Release stabile attuale: v1.1.1** (prima versione: v1.0.0). Due EXE Windows indipendenti, con identità grafica, cache, processi e cronologia separati. Il progetto `powershell-personalizzation` non viene modificato; qui non vengono aggiunti alias o profili globali.
+**Release stabile attuale: v1.1.2** (prima versione: v1.0.0). Due EXE Windows indipendenti, con identità grafica, cache, processi e cronologia separati. Il progetto `powershell-personalizzation` non viene modificato; qui non vengono aggiunti alias o profili globali.
 
-## Build Windows
+Nella **v1.1.2** lo script PowerShell legge correttamente il manifesto SHA-256 della release, senza saltare la verifica di integrità. Le cartelle virtuali, comprese «Non organizzate» e «Secchio», sono inizialmente **chiuse**; si espandono al clic e si apre automaticamente la cartella della conversazione attiva selezionata. **Nuova conversazione qui** si trova nel menu contestuale facendo clic destro sull'intestazione della cartella.\n\n## Build Windows
 
 GitHub Actions compila le due versioni con .NET 10, Node 22 e xterm.js. I pacchetti portabili sono pubblicati come due artifact separati: `ClaudeTerminal-win-x64` e `CodexTerminal-win-x64`. Non serve installare SDK, npm o privilegi amministrativi sul PC di utilizzo. WebView2 Runtime e le rispettive CLI devono essere presenti.
 
