@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   meeting-notes:
@@ -75,3 +76,14 @@ jobs:
           path: out/MeetingNotes/
           if-no-files-found: error
           retention-days: 14
+      - name: Smoke test installer via GitHub API without gh
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & './scripts/meetings/Install-MeetingNotes.ps1' -Destination "$env:GITHUB_WORKSPACE/out/MeetingNotesInstallerSmoke"
+          if (-not (Test-Path -LiteralPath 'out/MeetingNotesInstallerSmoke/MeetingNotes.exe' -PathType Leaf)) {
+            throw 'Installer did not restore MeetingNotes.exe'
+          }
+          Write-Host '[PASS] Installer downloads Actions artifact without gh CLI.'
