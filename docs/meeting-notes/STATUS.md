@@ -172,6 +172,28 @@ dei tre stili, compilazione e verifica icona incorporata, Whisper CPU,
 formato appunti Outlook e installer senza GitHub CLI.
 https://github.com/simracemanagerinfo/ai-terminals/actions/runs/45165426726
 
+## Fase 5 — Trascrizione automatica e retention dei WAV (2026-11-23)
+
+- Premendo Ferma o raggiungendo il limite, dopo la chiusura dei WAV
+  parte automaticamente Whisper offline sui file della sessione appena chiusa.
+- Le sorgenti usate sono quelle effettivamente acquisite, anche se le opzioni
+  di trascrizione manuale nella GUI sono diverse.
+- Impostazioni: "Mantieni file audio originale" OFF per default, persistente
+  nel profilo utente, valore fissato all'inizio della registrazione.
+- Se OFF, cancella esclusivamente i WAV microfono.wav e audio-pc.wav della
+  sessione appena registrata, dopo successo STT con segmenti e TXT UTF-8 valido
+  scritto nella cartella di trascrizione. Se la cartella diventa vuota, la rimuove.
+- Se ON, conserva entrambi i WAV anche quando il TXT è stato creato.
+- Modello mancante, errore, annullamento, timeout, TXT vuoto/non valido:
+  conserva l'audio per il recupero.
+- La trascrizione manuale da WAV selezionati, inclusi vecchi audio, NON elimina
+  i sorgenti in automatico: evita perdita accidentale di audio importati.
+- La generazione della minuta IA resta un'azione esplicita con autorizzazione.
+- Test sintetici in MeetingNotesSmoke includono default OFF, preferenze
+  salvate/corrotte, TXT mancante/vuoto, flag ON, WAV non appartenenti alla
+  registrazione e pulizia circoscritta a una sessione valida.
+- Convalida E2E sui dispositivi audio reali ancora da fare.
+
 ## Prossime fasi (NON ancora implementate)
 - Collaudo su PC aziendale di Whisper CPU con modello reale, accuratezza e prestazioni.
 - Sicurezza avanzata: cifratura, conservazione automatica, gestione consensi.
