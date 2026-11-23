@@ -31,6 +31,7 @@ jobs:
             'scripts/meetings/Invoke-MeetingMinutes.ps1',
             'scripts/meetings/Invoke-MeetingProvider.ps1',
             'scripts/meetings/Install-MeetingNotes.ps1',
+            'scripts/meetings/Install-WhisperModel.ps1',
             'tests/MeetingMinutes.Tests.ps1'
           )
           foreach ($path in $files) {
@@ -75,6 +76,7 @@ jobs:
           }
           & './out/MeetingNotes/transcriber/MeetingTranscriber.exe' --self-test
           if ($LASTEXITCODE -ne 0) { throw 'WAV resampler test failed.' }
+          if (-not (Test-Path -LiteralPath 'out/MeetingNotes/transcriber/Whisper.net.dll' -PathType Leaf)) { throw 'Missing Whisper.net in standalone package' }
       - name: Validate HTML clipboard offsets
         shell: pwsh
         run: |
