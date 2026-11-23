@@ -115,11 +115,27 @@
                     ValueChanged="StyleInput_ValueChanged"
                     Margin="0,0,0,17"/>
 
+            <Expander Header="Impostazioni" IsExpanded="False" Margin="0,0,0,16"
+                      Background="White" BorderBrush="#DCE6EA" BorderThickness="1"
+                      Padding="10">
+              <StackPanel Margin="0,9,0,7">
+                <CheckBox x:Name="KeepOriginalAudioInput"
+                          Content="Mantieni file audio originale"
+                          IsChecked="False"
+                          Checked="KeepOriginalAudio_Changed"
+                          Unchecked="KeepOriginalAudio_Changed"
+                          FontWeight="SemiBold"/>
+                <TextBlock Text="Disattivato per impostazione predefinita. Dopo una trascrizione automatica riuscita, i WAV appena registrati vengono eliminati. Se fallisce, vengono conservati."
+                           Foreground="#647887" FontSize="11" TextWrapping="Wrap"
+                           Margin="23,7,0,0"/>
+              </StackPanel>
+            </Expander>
+
             <Border Background="#F5FAFC" BorderBrush="#DCE6EA" BorderThickness="1"
                     CornerRadius="8" Padding="12" Margin="0,0,0,18">
               <StackPanel>
                 <TextBlock Text="Prova registrazione audio" FontSize="15" FontWeight="Bold"/>
-                <TextBlock Text="Registrazione locale fino a 120 minuti. Controlla lo spazio disco; nessun upload."
+                <TextBlock Text="Registrazione locale fino a 120 minuti. Alla fine parte la trascrizione offline. Nessun upload."
                            Foreground="#647887" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,10"/>
                 <WrapPanel Margin="0,0,0,8">
                   <CheckBox x:Name="CaptureMicrophone" Content="Microfono" IsChecked="True" Margin="0,0,18,0"/>
@@ -176,7 +192,7 @@
                   <Button x:Name="CancelTranscribeButton" Content="Annulla trascrizione"
                           Click="CancelTranscribe_Click" IsEnabled="False" Margin="0,0,8,8"/>
                 </WrapPanel>
-                <TextBlock x:Name="SttStatusText" Text="Il modello va scaricato una sola volta e selezionato."
+                <TextBlock x:Name="SttStatusText" Text="Al termine della registrazione Whisper partirà automaticamente, se il modello è disponibile."
                            Foreground="#647887" FontSize="11" TextWrapping="Wrap"/>
               </StackPanel>
             </Border>
@@ -241,7 +257,7 @@
     <Border Grid.Row="2" Background="White" BorderBrush="#DCE6EA" BorderThickness="0,1,0,0"
             Padding="25,11">
       <DockPanel>
-        <TextBlock Text="v0.4 · Stili minuta · icona Windows · WAV → TXT → Outlook"
+        <TextBlock Text="v0.5 · Trascrizione automatica · conservazione audio configurabile"
                    DockPanel.Dock="Right" Foreground="#647887" HorizontalAlignment="Right" FontSize="11"/>
         <TextBlock x:Name="StatusText" Text="Pronto · Nessun dato inviato" FontSize="12"
                    Foreground="#176F71" TextTrimming="CharacterEllipsis"/>
