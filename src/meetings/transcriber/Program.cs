@@ -82,7 +82,7 @@ internal static class Program
             // are possible. Speaker labels indicate the *device*, not a person.
             var lines = segments.OrderBy(s => s.Start)
                 .ThenBy(s => s.Speaker, StringComparer.Ordinal)
-                .Select(s => $"[{s.Start:hh\:mm\:ss}] [{s.Speaker}] {s.Text}");
+                .Select(s => $"[{s.Start.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture)}] [{s.Speaker}] {s.Text}");
             var textResult = string.Join(Environment.NewLine, lines) + Environment.NewLine;
             var transcriptPath = Path.Combine(outputDir,
                 $"trascrizione-audio-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.txt");
