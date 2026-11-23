@@ -11,6 +11,9 @@
     <Version>0.1.0</Version>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="NAudio" Version="3.3.0" />
+  </ItemGroup>
+  <ItemGroup>
     <Content Include="..\..\scripts\meetings\Invoke-MeetingMinutes.ps1">
       <Link>scripts\Invoke-MeetingMinutes.ps1</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
