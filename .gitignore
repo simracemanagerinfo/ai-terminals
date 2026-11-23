@@ -21,3 +21,7 @@
 *.wav
 *.mp3
 *.m4a
+
+# Whisper speech model weights (user-managed, never commit)
+**/ggml-*.bin
+**/Models/ggml-*.bin
