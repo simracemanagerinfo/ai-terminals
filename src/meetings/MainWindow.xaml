@@ -131,6 +131,47 @@
               </StackPanel>
             </Border>
 
+            <Border Background="#F5FAFC" BorderBrush="#DCE6EA" BorderThickness="1"
+                    CornerRadius="8" Padding="12" Margin="0,0,0,18">
+              <StackPanel>
+                <TextBlock Text="Trascrizione offline · Whisper" FontSize="15" FontWeight="Bold"/>
+                <TextBlock Text="Elaborazione CPU in locale, nessun upload dell'audio."
+                           Foreground="#647887" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,10"/>
+                <TextBlock Text="Modello multilingua GGML (.bin)" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                  </Grid.ColumnDefinitions>
+                  <TextBox x:Name="WhisperModelInput" IsReadOnly="True" Text="Nessun modello selezionato"
+                           Grid.Column="0" ToolTip="Seleziona un modello .bin locale, non la variante .en."/>
+                  <Button Grid.Column="1" Content="Sfoglia..." Click="BrowseModel_Click" Margin="7,0,0,0"/>
+                </Grid>
+                <TextBlock Text="Registrazione WAV da trascrivere" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <Grid Margin="0,0,0,8">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                  </Grid.ColumnDefinitions>
+                  <TextBox x:Name="RecordingInput" IsReadOnly="True" Text="Registra oppure scegli un WAV"
+                           Grid.Column="0" ToolTip="I WAV microfono.wav e audio-pc.wav della stessa cartella possono essere elaborati insieme."/>
+                  <Button Grid.Column="1" Content="Sfoglia WAV..." Click="BrowseRecording_Click" Margin="7,0,0,0"/>
+                </Grid>
+                <WrapPanel Margin="0,0,0,10">
+                  <CheckBox x:Name="SttMicrophone" Content="Microfono" IsChecked="True" Margin="0,0,16,0"/>
+                  <CheckBox x:Name="SttSystem" Content="Audio del PC" IsChecked="True"/>
+                </WrapPanel>
+                <WrapPanel>
+                  <Button x:Name="TranscribeButton" Content="Trascrivi offline" Click="Transcribe_Click"
+                          Background="#176F71" Foreground="White" BorderBrush="#176F71" Margin="0,0,8,8"/>
+                  <Button x:Name="CancelTranscribeButton" Content="Annulla trascrizione"
+                          Click="CancelTranscribe_Click" IsEnabled="False" Margin="0,0,8,8"/>
+                </WrapPanel>
+                <TextBlock x:Name="SttStatusText" Text="Il modello va scaricato una sola volta e selezionato."
+                           Foreground="#647887" FontSize="11" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
+
             <Border x:Name="ConsentPanel" Background="#F3F7F7" CornerRadius="8" Padding="12" Margin="0,0,0,16">
               <StackPanel>
                 <CheckBox x:Name="ConsentInput"
@@ -191,7 +232,7 @@
     <Border Grid.Row="2" Background="White" BorderBrush="#DCE6EA" BorderThickness="0,1,0,0"
             Padding="25,11">
       <DockPanel>
-        <TextBlock Text="v0.2 · Cartella di lavoro · WAV e TXT → minuta Outlook"
+        <TextBlock Text="v0.3 · Trascrizione offline · WAV → TXT → minuta Outlook"
                    DockPanel.Dock="Right" Foreground="#647887" HorizontalAlignment="Right" FontSize="11"/>
         <TextBlock x:Name="StatusText" Text="Pronto · Nessun dato inviato" FontSize="12"
                    Foreground="#176F71" TextTrimming="CharacterEllipsis"/>
