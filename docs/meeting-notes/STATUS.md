@@ -197,6 +197,20 @@ https://github.com/simracemanagerinfo/ai-terminals/actions/runs/45165426726
   WAV, WPF, Whisper CPU, icona, appunti Outlook e installazione senza gh.
   https://github.com/simracemanagerinfo/ai-terminals/actions/runs/45172289619
 
+## Fase 6 — Barra di registrazione rapida (2026-11-23)
+
+- Nella testata in alto a destra sono sempre visibili Registra, Ferma,
+  timer hh:mm:ss e stato (registrazione, salvataggio, STT, TXT pronto).
+- Il pannello laterale resta scorrevole e conserva tutte le opzioni avanzate.
+- I tasti rapidi usano esattamente StartAudio_Click e StopAudio_Click:
+  nessuna seconda registrazione, stato IsEnabled vincolato ai tasti laterali.
+- Conferma della registrazione tramite finestra Yes/No quando non è spuntato
+  il consenso laterale. La scelta non viene mantenuta fra le registrazioni.
+- Nella CI è controllata la struttura XAML dei pulsanti e il collegamento agli
+  stessi handler e stati; il comportamento interattivo è da provare su Windows.
+- Pipeline dedicata: GitHub Actions 45185872223 PASS
+  https://github.com/simracemanagerinfo/ai-terminals/actions/runs/45185872223
+
 ## Prossime fasi (NON ancora implementate)
 - Collaudo su PC aziendale di Whisper CPU con modello reale, accuratezza e prestazioni.
 - Sicurezza avanzata: cifratura, conservazione automatica, gestione consensi.
