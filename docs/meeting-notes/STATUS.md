@@ -90,6 +90,23 @@ aziendale. Non dichiarare completo il collaudo E2E prima di questi riscontri.
 - Senza credenziali prova dotnet publish, se il .NET SDK è disponibile.
 - Installazione sul PC aziendale ancora da verificare realmente.
 
+## Cartella di lavoro e TXT manuale (2026-11-23)
+
+- Aggiunta cartella di lavoro selezionabile nella GUI e memorizzata in
+  %LOCALAPPDATA%\AI-Terminals\MeetingNotes\workspace-settings.json.
+- Sottocartelle: registrazioni/, trascrizioni/, minute/.
+- Audio WAV e HTML/JSON/TXT della minuta vengono creati nella cartella scelta.
+- Editor testo: import TXT, crea nuovo testo, modifica e salva un TXT UTF-8.
+- Genera minuta salva prima uno snapshot univoco del testo corrente, per evitare
+  sovrascritture o invii di una versione diversa da quella visibile.
+- Non sposta i file prodotti prima dell'aggiornamento.
+- Rifiuta cartelle interne a repository o worktree Git, per ridurre il rischio
+  di commit accidentali di dati riservati.
+- Test Windows della struttura cartelle, caratteri italiani, nomi univoci e
+  protezione Git inseriti nella suite MeetingNotesSmoke.
+- La trascrizione automatica WAV → TXT NON è ancora implementata; il testo
+  salvato tramite editor è inserito/importato manualmente.
+
 ## Prossime fasi (NON ancora implementate)
 - Trascrizione locale STT dei WAV, da valutare con whisper.cpp e modello approvato.
 - Sicurezza avanzata: cifratura, conservazione automatica, gestione consensi.
