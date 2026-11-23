@@ -52,6 +52,9 @@ function Publish-Locally {
     if (-not (Test-Path -LiteralPath $projectFile -PathType Leaf)) { throw 'Progetto MeetingNotes.csproj non trovato.' }
     & $dotnet.Source publish $projectFile -c Release -r win-x64 --self-contained true -o $StagingPath
     if ($LASTEXITCODE -ne 0) { throw 'Compilazione MeetingNotes.exe non riuscita.' }
+    $sttProject = Join-Path $ProjectRoot 'src\meetings\transcriber\MeetingTranscriber.csproj'
+    & $dotnet.Source publish $sttProject -c Release -r win-x64 --self-contained true -o (Join-Path $StagingPath 'transcriber')
+    if ($LASTEXITCODE -ne 0) { throw 'Compilazione del motore offline Whisper non riuscita.' }
 }
 
 if (Get-Process -Name 'MeetingNotes' -ErrorAction SilentlyContinue) {
@@ -76,11 +79,24 @@ try {
             }
             $token = $null
             if ($RunId -gt 0) {
-                # Explicit run selection for CI and controlled rollback/testing.
-                # A run in progress is valid only if its artifact already exists.
                 $selectedRun = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/actions/runs/$RunId" -Headers $headers -TimeoutSec 45
                 if ($selectedRun.head_branch -ne 'feature/meeting-notes' -or
-                    $selectedRun.path -notmatch 'meeting-notes-tests\.yml
+                    $selectedRun.path -notmatch 'meeting-notes-tests\.yml$' -or
+                    $selectedRun.conclusion -eq 'failure') {
+                    throw 'La build specificata non è un workflow valido di Meeting Notes.'
+                }
+                $runId = $RunId
+            }
+            else {
+                $branch = [uri]::EscapeDataString('feature/meeting-notes')
+                $runsUri = "https://api.github.com/repos/$Repository/actions/runs?branch=$branch&status=success&per_page=30"
+                $runs = Invoke-RestMethod -Uri $runsUri -Headers $headers -TimeoutSec 45
+                $latest = @($runs.workflow_runs | Where-Object {
+                    $_.conclusion -eq 'success' -and $_.path -match 'meeting-notes-tests\.yml$'
+                } | Sort-Object created_at -Descending | Select-Object -First 1)
+                if ($latest.Count -ne 1) { throw 'Non esiste una build Meeting Notes riuscita.' }
+                $runId = [long]$latest[0].id
+            }
             $index = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/actions/runs/$runId/artifacts?per_page=100" -Headers $headers -TimeoutSec 45
             $artifact = @($index.artifacts | Where-Object {
                 $_.name -eq 'MeetingNotes-win-x64' -and -not $_.expired
