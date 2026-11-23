@@ -211,6 +211,28 @@ https://github.com/simracemanagerinfo/ai-terminals/actions/runs/45165426726
 - Pipeline dedicata: GitHub Actions 45185872223 PASS
   https://github.com/simracemanagerinfo/ai-terminals/actions/runs/45185872223
 
+## Diagnostica Whisper e tracce incomplete (2026-11-23)
+
+- Prima: la UI scartava stderr e mostrava un errore indistinto
+  "Whisper non ha terminato correttamente la trascrizione".
+- Ora: il processo figlio trasmette metadati diagnostici strutturati
+  con fase ("conversione WAV AUDIO PC", "caricamento modello Whisper",
+  "riconoscimento vocale MICROFONO" ecc.) e categoria dell'eccezione,
+  senza contenuto della riunione, nomi dei partecipanti o path sensibili.
+- La GUI mostra la fase, un suggerimento di verifica e l'exit code;
+  se un runtime termina senza diagnostica viene mostrato anche l'hex code.
+- Se una sorgente WASAPI produce un WAV troppo breve/intestazione vuota,
+  Whisper prova a elaborare l'altra; il TXT risultante è marcato parziale
+  e **nessun WAV viene eliminato**, indipendentemente dal flag retention.
+- Continuano a non essere cancellati i file dopo timeout/errore/annullamento;
+  gli audio conservati possono essere rielaborati manualmente con
+  "Sfoglia WAV" → "Trascrivi offline".
+- Self-test Windows aggiunti per PCM 48kHz stereo, float IEEE 48kHz stereo
+  e WAV vuoto, più test sui messaggi diagnostici privi di stderr grezzo.
+- Causa precisa dell'errore segnalato dall'utente non ancora determinabile
+  dal vecchio popup: serve il messaggio dettagliato su una ri-esecuzione
+  con i WAV già registrati.
+
 ## Prossime fasi (NON ancora implementate)
 - Collaudo su PC aziendale di Whisper CPU con modello reale, accuratezza e prestazioni.
 - Sicurezza avanzata: cifratura, conservazione automatica, gestione consensi.
