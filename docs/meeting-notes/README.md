@@ -85,8 +85,8 @@ non si dichiara una conformità formale ASD-STE100 in italiano.
 
 ## Limiti dell'MVP
 
-- Nessuna registrazione audio o trascrizione automatica (fase successiva).
-- Nessuna app Windows grafica già pronta (fase successiva).
+- La registrazione locale WAV è disponibile nella GUI; resta da implementare la trascrizione automatica offline.
+- La GUI Windows è disponibile, con cartella di lavoro configurabile e editor TXT.
 - Il modello può sbagliare: decisioni, assegnazioni e scadenze richiedono
   revisione umana prima della diffusione.
 - Codex in sandbox read-only non equivale a isolamento totale dei dati.
@@ -127,9 +127,38 @@ dotnet publish "$project\src\meetings\MeetingNotes.csproj" -c Release -r win-x64
 & "$project\out\MeetingNotes\MeetingNotes.exe"
 ~~~
 
+### Cartella di lavoro (GUI)
+
+La schermata permette di scegliere una cartella locale, fuori da qualsiasi
+repository Git, per archiviare i dati. La scelta viene ricordata nella
+configurazione locale per i prossimi avvii. Non sposta automaticamente i file
+creati dalle versioni precedenti.
+
+All'interno vengono utilizzate tre sottocartelle:
+
+- registrazioni: sottocartelle per ciascuna acquisizione, con file WAV separati
+  per microfono e audio del PC;
+- trascrizioni: TXT UTF-8 creati dall'editor o importati e risalvati;
+- minute: una cartella per ogni elaborazione, con minutes.html,
+  minutes.txt e minutes.json.
+
+Con "Sfoglia" si può ancora importare un TXT esterno. Altrimenti è possibile
+scrivere o incollare una trascrizione nell'editor, quindi premere "Salva TXT":
+l'app genera un file con nome univoco, senza sovrascrivere quelli esistenti.
+Premendo "Genera minuta" viene salvata automaticamente una copia del testo
+corrente prima di chiamare il provider.
+
+**Importante:** registrare un WAV non produce ancora una trascrizione TXT.
+La conversione automatica audio -> testo sarà implementata dopo aver
+verificato il microfono e il loopback sul PC reale. Fino a quel momento
+la modifica o la creazione del TXT è manuale.
+
+Evita cartelle sincronizzate o condivise se le policy aziendali non ne
+consentono l'uso per contenuti delle riunioni.
+
 ### Uso
 
-1. Seleziona un file TXT UTF-8 e indica il titolo della riunione.
+1. Seleziona la cartella di lavoro. Importa un TXT oppure scrivi/incolla il testo nell'editor e premi Salva TXT; indica il titolo.
 2. Scegli Claude Code, Codex oppure Mock. Mock richiede un file JSON sintetico;
    non usa la rete.
 3. Per i provider reali, conferma che la trascrizione può essere inviata in
@@ -150,7 +179,7 @@ Nella finestra Meeting Notes è presente una sezione "Prova registrazione audio"
 3. Premi "Registra", parla nel microfono e riproduci un contenuto di prova
    dal computer. La registrazione locale si ferma automaticamente dopo 10 minuti.
 4. Premi "Ferma", poi "File audio": vengono salvati file WAV distinti
-   microfono.wav e audio-pc.wav nella cartella delle registrazioni.
+   microfono.wav e audio-pc.wav nella sottocartella registrazioni della cartella di lavoro.
 5. Ascolta i due file separatamente per verificare chiarezza, livelli e
    funzionamento effettivo delle sorgenti.
 
