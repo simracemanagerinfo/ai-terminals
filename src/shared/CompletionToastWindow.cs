@@ -21,7 +21,7 @@ public sealed class CompletionToastWindow : Window
     private readonly DispatcherTimer _dismissTimer;
     private readonly Action _openConversation;
 
-    public CompletionToastWindow(Window owner, string provider, string title, Action openConversation)
+    public CompletionToastWindow(Window owner, string provider, string title, Action openConversation, bool waitingForInput = false)
     {
         _openConversation = openConversation;
         Width = 354;
@@ -35,7 +35,7 @@ public sealed class CompletionToastWindow : Window
         Background = Brushes.Transparent;
         WindowStartupLocation = WindowStartupLocation.Manual;
 
-        var accent = provider == "Codex"
+        var accent = waitingForInput ? Color.FromRgb(255, 197, 92) : provider == "Codex"
             ? Color.FromRgb(102, 238, 231)
             : Color.FromRgb(230, 154, 112);
         var border = new Border
@@ -55,7 +55,7 @@ public sealed class CompletionToastWindow : Window
         var content = new StackPanel();
         content.Children.Add(new TextBlock
         {
-            Text = provider + " · " + UiText.T("toastComplete"),
+            Text = provider + " · " + UiText.T(waitingForInput ? "toastInputRequired" : "toastComplete"),
             FontWeight = FontWeights.Bold,
             FontSize = 13,
             Foreground = new SolidColorBrush(accent)
@@ -94,7 +94,7 @@ public sealed class CompletionToastWindow : Window
         Left = bottomRight.X - Width - 18;
         Top = bottomRight.Y - Height - 18;
 
-        _dismissTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(7) };
+        _dismissTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(waitingForInput ? 15 : 7) };
         _dismissTimer.Tick += (_, _) => Close();
         Closed += (_, _) => _dismissTimer.Stop();
     }
