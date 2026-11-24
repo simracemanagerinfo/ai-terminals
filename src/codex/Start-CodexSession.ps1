@@ -47,7 +47,13 @@ try {
                 "'" + $value + "'"
             }
         }
-        $options = @('-c', ('notify=[' + ($tomlArgs -join ',') + ']'))
+        # Native TUI notifications cover interactive questions and approvals.
+        # The host sees OSC 9 even for a background session in this window.
+        # Keep completion on the existing structured external hook.
+        $options = @('-c', ('notify=[' + ($tomlArgs -join ',') + ']'),
+                     '-c', 'tui.notifications=["approval-requested","plan-mode-prompt","user-input-requested","async-question"]',
+                     '-c', 'tui.notification_method="osc9"',
+                     '-c', 'tui.notification_condition="always"')
     }
 
     if ($SessionId) {
