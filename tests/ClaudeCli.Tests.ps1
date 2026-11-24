@@ -92,6 +92,21 @@ try {
         throw 'Claude Stop hook did not record a private completion marker'
     }
 
+    '{"hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","tool_input":{"question":"private question"}}' |
+        & pwsh.exe -NoLogo -NoProfile -File $hook -SignalPath $signal
+    '{"hook_event_name":"Notification","notification_type":"permission_prompt","message":"private approval"}' |
+        & pwsh.exe -NoLogo -NoProfile -File $hook -SignalPath $signal
+    '{"hook_event_name":"Notification","notification_type":"idle_prompt"}' |
+        & pwsh.exe -NoLogo -NoProfile -File $hook -SignalPath $signal
+    '{"hook_event_name":"PreToolUse","tool_name":"Read"}' |
+        & pwsh.exe -NoLogo -NoProfile -File $hook -SignalPath $signal
+    $lines = @(Get-Content -LiteralPath $signal)
+    if ($lines.Count -ne 3 -or $lines[1] -notmatch '^input:[0-9a-f]{32}$' -or
+        $lines[2] -notmatch '^input:[0-9a-f]{32}$' -or
+        (Get-Content -LiteralPath $signal -Raw).Contains('private')) {
+        throw 'Claude input hook leaked content or accepted non-blocking events'
+    }
+
     # Il caso negativo lascia LASTEXITCODE=1 nel processo di test, che GitHub
     # Actions interpretera come fallimento anche se tutte le asserzioni sono OK.
     $global:LASTEXITCODE = 0
