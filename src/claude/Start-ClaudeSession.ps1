@@ -49,11 +49,17 @@ try {
             $notifyScript + '" -SignalPath "' +
             [IO.Path]::GetFullPath($CompletionSignalPath) + '"'
         $settings = @{
-            hooks = @{ Stop = @(@{ hooks = @(@{
-                type = 'command'
-                command = $cmd
-                timeout = 5
-            }) }) }
+            hooks = @{
+                Stop = @(@{ hooks = @(@{ type = 'command'; command = $cmd; timeout = 5 }) })
+                PreToolUse = @(@{
+                    matcher = '^AskUserQuestion$'
+                    hooks = @(@{ type = 'command'; command = $cmd; timeout = 5 })
+                })
+                Notification = @(@{
+                    matcher = '^(permission_prompt|elicitation_dialog|elicitation_url_dialog)$'
+                    hooks = @(@{ type = 'command'; command = $cmd; timeout = 5 })
+                })
+            }
         } | ConvertTo-Json -Depth 8
         # Claude's Windows .cmd shim can strip quotes from inline JSON.
         # --settings explicitly supports a file path; persist the temporary
