@@ -272,6 +272,30 @@ try
         UiText.T("unknown-code") != "unknown-code")
         throw new Exception("UI language fallback or Bin translation is invalid.");
 
+    var attention = new AttentionSignals();
+    var otherAttention = new AttentionSignals();
+    if (attention.Read("Do you want to continue?") != 0 ||
+        attention.Read("\a") != 0 ||
+        attention.Read("\x1b]9;4;1;50\a") != 0 ||
+        attention.Read("\x1b]0;title\a") != 0 ||
+        attention.Read("\x1b") != 0 ||
+        otherAttention.Read("]9;Choose an option\a") != 0 ||
+        attention.Read("]9;Choose") != 0 ||
+        attention.Read(" an option\a") != 1 ||
+        attention.Read("\x1b]9;Approval requested\x1b") != 0 ||
+        attention.Read("\\") != 1 ||
+        attention.Read("\x1b]9;" + new string('x', 9000) + "\a") != 0 ||
+        attention.Read("\x1b]9;Another question\a") != 1)
+        throw new Exception("Attention OSC parser failed on split, unrelated, oversized or cross-session output.");
+    if (!AttentionSignals.IsAttentionMarker("input:" + Guid.NewGuid().ToString("N")) ||
+        AttentionSignals.IsAttentionMarker("input:invalid") ||
+        AttentionSignals.IsAttentionMarker("turn-1") ||
+        AttentionSignals.IsResponseInput("\x1b[A") ||
+        !AttentionSignals.IsResponseInput("\r") ||
+        !AttentionSignals.IsResponseInput("\x03"))
+        throw new Exception("Attention marker or response input filtering failed.");
+    Console.WriteLine("[PASS] Input-required notification parser, chunk boundaries, session isolation and filtering");
+
     Console.WriteLine("[PASS] Claude response dedupe; Codex token snapshots/reset; Claude stored titles, explicit Codex titles and response_item fallback");
 
 }
