@@ -10,6 +10,7 @@
     <Compile Include="../../src/shared/SessionHistory.cs" Link="SessionHistory.cs"/>
     <Compile Include="../../src/shared/CodexHistory.cs" Link="CodexHistory.cs"/>
     <Compile Include="../../src/shared/CodexCompletionSignals.cs" Link="CodexCompletionSignals.cs"/>
+    <Compile Include="../../src/shared/AttentionSignals.cs" Link="AttentionSignals.cs"/>
     <Compile Include="../../src/shared/SessionOrganization.cs" Link="SessionOrganization.cs"/>
     <Compile Include="../../src/shared/LiveFolderRouting.cs" Link="LiveFolderRouting.cs"/>
     <Compile Include="../../src/shared/UiText.cs" Link="UiText.cs"/>

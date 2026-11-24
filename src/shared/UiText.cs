@@ -102,6 +102,8 @@ public static class UiText
         ["selectFolderTitle"] = ("Organize conversation", "Organizza conversazione"),
         ["language"] = ("Language", "Lingua"),
         ["toastComplete"] = ("Response completed", "Risposta completata"),
+        ["toastInputRequired"] = ("Your response is required", "In attesa di una tua risposta"),
+        ["inputRequired"] = ("Waiting for input", "In attesa di risposta"),
         ["toastOpen"] = ("Click to open the conversation", "Clicca per aprire la conversazione"),
         ["usageTitle"] = ("Local token usage", "Utilizzo token locale"),
         ["usageSubtitle"] = ("{0} · statistics from local JSONL files", "{0} · statistiche dai file JSONL locali"),

@@ -191,7 +191,13 @@ public partial class MainWindow : Window
                     {
                         if (IsActive && _visibleTerminalId == id)
                             MarkRead(active);
-                        await active.Terminal.WriteAsync(dataValue.GetString() ?? "");
+                        var input = dataValue.GetString() ?? "";
+                        if (active.WaitingForInput && AttentionSignals.IsResponseInput(input))
+                        {
+                            active.WaitingForInput = false;
+                            UpdateSidebar();
+                        }
+                        await active.Terminal.WriteAsync(input);
                     }
                     break;
                 case "copy":
@@ -255,7 +261,15 @@ public partial class MainWindow : Window
             buf.Append(item.Text);
         }
         foreach (var (id, value) in buffers)
-            Send(new { type = "output", id, data = value.ToString() });
+        {
+            var data = value.ToString();
+            if (_sessions.TryGetValue(id, out var active) &&
+                active.Provider == "Codex" && active.CompletionSignalPath is not null &&
+                active.Status is "Avvio" or "In esecuzione" &&
+                active.Attention.Read(data) > 0)
+                RequestAttention(active);
+            Send(new { type = "output", id, data });
+        }
     }
 
     private static string QuoteWindowsArgument(string input)
@@ -377,6 +391,7 @@ public partial class MainWindow : Window
         {
             if (_closing || !_sessions.ContainsKey(id)) return;
             item.Status = "Terminata";
+            item.WaitingForInput = false;
             UpdateSidebar();
             Send(new { type = "exited", id, code });
             if (_visibleTerminalId == id)
@@ -481,38 +496,56 @@ public partial class MainWindow : Window
             var turns = CodexCompletionSignals.ReadNewTurnIds(
                 session.CompletionSignalPath, ref read, session.SeenNotifications);
             session.NotificationsRead = read;
-            if (turns.Count == 0) continue;
-
-            if (session.Provider == "Codex")
+            foreach (var marker in turns)
             {
-                foreach (var marker in turns)
+                if (AttentionSignals.IsAttentionMarker(marker))
                 {
-                    if (!CodexCompletionSignals.TryGetThreadId(marker, out var threadId))
-                        continue;
+                    if (session.Status is "Avvio" or "In esecuzione")
+                        RequestAttention(session);
+                    continue;
+                }
+
+                if (session.Provider == "Codex" &&
+                    CodexCompletionSignals.TryGetThreadId(marker, out var threadId))
+                {
                     session.ClaudeSessionId ??= threadId;
-                    if (session.PendingFolderId is not { } folder || _organization is null)
-                        continue;
-                    try
+                    if (session.PendingFolderId is { } folder && _organization is not null)
                     {
-                        _organization.Move(session.ProjectPath, threadId, folder);
-                        session.PendingFolderId = null;
-                    }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
-                    {
-                        FooterStatus.Text = UiText.T("organizationError", ex.Message);
+                        try
+                        {
+                            _organization.Move(session.ProjectPath, threadId, folder);
+                            session.PendingFolderId = null;
+                        }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+                        {
+                            FooterStatus.Text = UiText.T("organizationError", ex.Message);
+                        }
                     }
                 }
-            }
 
-            session.Unread = true;
-            changed = true;
-            if (!IsActive || WindowState == System.Windows.WindowState.Minimized)
-                ShowCompletionToast(session);
+                session.WaitingForInput = false;
+                session.Unread = true;
+                changed = true;
+                if (!IsActive || WindowState == System.Windows.WindowState.Minimized)
+                    ShowCompletionToast(session);
+            }
         }
         if (changed) UpdateSidebar();
     }
 
-    private void ShowCompletionToast(LiveItem session)
+    private void RequestAttention(LiveItem session)
+    {
+        // Multiple native notifications for the same unanswered question
+        // must not create repeated popups. Reading a chat is not answering it.
+        if (session.WaitingForInput) return;
+        session.WaitingForInput = true;
+        UpdateSidebar();
+        if (!IsActive || WindowState == System.Windows.WindowState.Minimized ||
+            _visibleTerminalId != session.Id)
+            ShowCompletionToast(session, waitingForInput: true);
+    }
+
+    private void ShowCompletionToast(LiveItem session, bool waitingForInput = false)
     {
         try
         {
@@ -527,7 +560,7 @@ public partial class MainWindow : Window
                 UpdateSidebar(preferredTerminalId: target.Id);
                 Activate();
                 MarkRead(target);
-            });
+            }, waitingForInput);
             _completionToast = toast;
             toast.Closed += (_, _) =>
             {
@@ -584,23 +617,26 @@ public partial class MainWindow : Window
                 detail.Contains(search, StringComparison.OrdinalIgnoreCase);
         }
 
-        void AddHeader(string key, string name, int count, string? folderId = null)
+        void AddHeader(string key, string name, int count, string? folderId = null, int waiting = 0)
         {
             var collapsed = _collapsedFolders.Contains(key);
             var symbol = folderId == SessionOrganization.Bin ? "🪣" : "▣";
             rows.Add(new SidebarRow(key, (collapsed ? "▸ " : "▾ ") + symbol +
-                "  " + name + " (" + count + ")", "", null, null,
-                IsHeader: true, FolderId: folderId));
+                "  " + name + " (" + count + ")" +
+                (waiting > 0 ? " · ! " + waiting : ""), "", null, null,
+                IsUnread: waiting > 0, IsHeader: true, FolderId: folderId));
         }
 
         void AddLiveRow(LiveItem active)
         {
-            var title = active.Unread ? "● " + active.Label : active.Label;
+            var title = active.WaitingForInput ? "! " + active.Label :
+                active.Unread ? "● " + active.Label : active.Label;
             var detail = active.Provider + " · " + DisplayStatus(active.Status) +
                          " · " + Path.GetFileName(active.ProjectPath) +
-                         (active.Unread ? " · " + UiText.T("responseReady") : "");
+                         (active.WaitingForInput ? " · " + UiText.T("inputRequired") :
+                          active.Unread ? " · " + UiText.T("responseReady") : "");
             rows.Add(new SidebarRow("live:" + active.Id, title, detail, active, null,
-                IsUnread: active.Unread, Indent: new Thickness(15, 0, 0, 0)));
+                IsUnread: active.Unread || active.WaitingForInput, Indent: new Thickness(15, 0, 0, 0)));
         }
 
         // When switching projects, keep processes from other projects reachable
@@ -613,7 +649,8 @@ public partial class MainWindow : Window
         if (otherProjectLive.Length > 0)
         {
             const string activeSection = "section:active";
-            AddHeader(activeSection, UiText.T("otherProjectActive"), otherProjectLive.Length);
+            AddHeader(activeSection, UiText.T("otherProjectActive"), otherProjectLive.Length,
+                waiting: otherProjectLive.Count(x => x.WaitingForInput));
             if (!_collapsedFolders.Contains(activeSection))
                 foreach (var active in otherProjectLive)
                     AddLiveRow(active);
@@ -664,7 +701,8 @@ public partial class MainWindow : Window
 
                 var key = folderId.Length == 0 ? "__unfiled__" : folderId;
                 var section = SectionKey(key);
-                AddHeader(section, title, assignedLive.Length + assignedHistory.Length, folderId);
+                AddHeader(section, title, assignedLive.Length + assignedHistory.Length, folderId,
+                    assignedLive.Count(x => x.WaitingForInput));
                 if (_collapsedFolders.Contains(section)) return;
 
                 foreach (var active in assignedLive.Where(MatchesLive))
@@ -1248,6 +1286,8 @@ public partial class MainWindow : Window
         public int NotificationsRead { get; set; }
         public HashSet<string> SeenNotifications { get; } = new(StringComparer.Ordinal);
         public bool Unread { get; set; }
+        public bool WaitingForInput { get; set; }
+        public AttentionSignals Attention { get; } = new();
         public string ProjectPath { get; }
         public string Provider { get; }
         public ConPtySession Terminal { get; }
