@@ -40,6 +40,9 @@ try {
         -not $captured.Contains('completion signals.txt')) {
         throw "Codex did not receive its private notifier: $captured"
     }
+    foreach ($expected in @("tui.notifications=", "approval-requested", "plan-mode-prompt", "tui.notification_method='osc9'", "tui.notification_condition='always'")) {
+        if (-not $captured.Contains($expected)) { throw "Missing Codex attention configuration: $expected" }
+    }
 
     Remove-Item -LiteralPath $env:CLAUDE_TERMINAL_TEST_LOG -Force
     & pwsh.exe -NoLogo -NoProfile -File $wrapper -ProjectPath $project -SessionId $id -CompletionSignalPath $signal | Out-Null
