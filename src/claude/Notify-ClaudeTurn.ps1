@@ -12,11 +12,21 @@ try {
     $raw = [Console]::In.ReadToEnd()
     if ([string]::IsNullOrWhiteSpace($raw)) { return }
     $event = $raw | ConvertFrom-Json -AsHashtable
-    if ($event['hook_event_name'] -ne 'Stop') { return }
-
-    # One new token for each completed reply in this window, independent
-    # of the session ID (which is stable across many replies).
-    Add-Content -LiteralPath $SignalPath -Value ([Guid]::NewGuid().ToString('N')) -Encoding utf8
+    $token = [Guid]::NewGuid().ToString('N')
+    switch ($event['hook_event_name']) {
+        'Stop' { }
+        'PreToolUse' {
+            if ($event['tool_name'] -ne 'AskUserQuestion') { return }
+            $token = 'input:' + $token
+        }
+        'Notification' {
+            if ($event['notification_type'] -notin @('permission_prompt','elicitation_dialog','elicitation_url_dialog')) { return }
+            $token = 'input:' + $token
+        }
+        default { return }
+    }
+    # Persist only opaque event markers, never the question or tool input.
+    Add-Content -LiteralPath $SignalPath -Value $token -Encoding utf8
 }
 catch {
     # Hook delivery failures should never interrupt an interactive session.
